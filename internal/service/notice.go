@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"shortlink/internal/config"
 	"shortlink/internal/notice"
+	"strings"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 )
+
+const noticeSendTimeout = 8 * time.Second
 
 type NoticeService struct {
 	mu        sync.RWMutex
@@ -25,44 +28,47 @@ func NewNoticeService(cfg *config.NotificationConfig, log *zap.Logger) *NoticeSe
 }
 
 func (s *NoticeService) initFromConfig(cfg *config.NotificationConfig) {
-	s.providers = nil
-	if cfg.Feishu.Enabled && cfg.Feishu.Webhook != "" {
-		s.providers = append(s.providers, notice.NewFeishuNotifier(cfg.Feishu.Webhook, cfg.Feishu.Secret))
+	if cfg == nil {
+		return
 	}
-	if cfg.Telegram.Enabled && cfg.Telegram.BotToken != "" && cfg.Telegram.ChatID != "" {
-		s.providers = append(s.providers, notice.NewTelegramNotifier(cfg.Telegram.BotToken, cfg.Telegram.ChatID))
-	}
-	if cfg.Dingtalk.Enabled && cfg.Dingtalk.Webhook != "" {
-		s.providers = append(s.providers, notice.NewDingtalkNotifier(cfg.Dingtalk.Webhook, cfg.Dingtalk.Secret))
-	}
-	if cfg.WeCom.Enabled && cfg.WeCom.Webhook != "" {
-		s.providers = append(s.providers, notice.NewWeComNotifier(cfg.WeCom.Webhook))
-	}
-	if cfg.Bark.Enabled && cfg.Bark.Key != "" {
-		s.providers = append(s.providers, notice.NewBarkNotifier(cfg.Bark.Key, cfg.Bark.Endpoint))
-	}
-	if cfg.Discord.Enabled && cfg.Discord.Webhook != "" {
-		s.providers = append(s.providers, notice.NewDiscordNotifier(cfg.Discord.Webhook))
-	}
-	if cfg.Email.Enabled && cfg.Email.Host != "" && cfg.Email.To != "" {
-		s.providers = append(s.providers, notice.NewEmailNotifier(cfg.Email.Host, cfg.Email.Port, cfg.Email.User, cfg.Email.Pass, cfg.Email.From, cfg.Email.To))
-	}
-	if cfg.Webhook.Enabled && cfg.Webhook.URL != "" {
-		s.providers = append(s.providers, notice.NewWebhookNotifier(cfg.Webhook.URL, cfg.Webhook.Secret))
-	}
+	providers := make([]notice.Notifier, 0, 8)
+	s.addProvider(&providers, cfg.Feishu.Enabled, "feishu", map[string]string{"webhook": cfg.Feishu.Webhook}, func() notice.Notifier {
+		return notice.NewFeishuNotifier(cfg.Feishu.Webhook, cfg.Feishu.Secret)
+	})
+	s.addProvider(&providers, cfg.Telegram.Enabled, "telegram", map[string]string{"bot_token": cfg.Telegram.BotToken, "chat_id": cfg.Telegram.ChatID}, func() notice.Notifier {
+		return notice.NewTelegramNotifier(cfg.Telegram.BotToken, cfg.Telegram.ChatID)
+	})
+	s.addProvider(&providers, cfg.Dingtalk.Enabled, "dingtalk", map[string]string{"webhook": cfg.Dingtalk.Webhook}, func() notice.Notifier {
+		return notice.NewDingtalkNotifier(cfg.Dingtalk.Webhook, cfg.Dingtalk.Secret)
+	})
+	s.addProvider(&providers, cfg.WeCom.Enabled, "wecom", map[string]string{"webhook": cfg.WeCom.Webhook}, func() notice.Notifier {
+		return notice.NewWeComNotifier(cfg.WeCom.Webhook)
+	})
+	s.addProvider(&providers, cfg.Bark.Enabled, "bark", map[string]string{"key": cfg.Bark.Key}, func() notice.Notifier {
+		return notice.NewBarkNotifier(cfg.Bark.Key, cfg.Bark.Endpoint)
+	})
+	s.addProvider(&providers, cfg.Discord.Enabled, "discord", map[string]string{"webhook": cfg.Discord.Webhook}, func() notice.Notifier {
+		return notice.NewDiscordNotifier(cfg.Discord.Webhook)
+	})
+	s.addProvider(&providers, cfg.Email.Enabled, "email", map[string]string{"host": cfg.Email.Host, "to": cfg.Email.To}, func() notice.Notifier {
+		return notice.NewEmailNotifier(cfg.Email.Host, cfg.Email.Port, cfg.Email.User, cfg.Email.Pass, cfg.Email.From, cfg.Email.To)
+	})
+	s.addProvider(&providers, cfg.Webhook.Enabled, "webhook", map[string]string{"url": cfg.Webhook.URL}, func() notice.Notifier {
+		return notice.NewWebhookNotifier(cfg.Webhook.URL, cfg.Webhook.Secret)
+	})
+	s.providers = providers
 }
 
 type noticeSettings struct {
-	Feishu        bool   `json:"feishu"`
-	FeishuWebhook string `json:"feishu_webhook"`
-	FeishuSecret  string `json:"feishu_secret"`
-	Telegram      bool   `json:"telegram"`
-	TgToken       string `json:"tg_token"`
-	TgChat        string `json:"tg_chat"`
-	Dingtalk      bool   `json:"dingtalk"`
-	DingWebhook   string `json:"ding_webhook"`
-	DingSecret    string `json:"ding_secret"`
-	// New channels
+	Feishu         bool   `json:"feishu"`
+	FeishuWebhook  string `json:"feishu_webhook"`
+	FeishuSecret   string `json:"feishu_secret"`
+	Telegram       bool   `json:"telegram"`
+	TgToken        string `json:"tg_token"`
+	TgChat         string `json:"tg_chat"`
+	Dingtalk       bool   `json:"dingtalk"`
+	DingWebhook    string `json:"ding_webhook"`
+	DingSecret     string `json:"ding_secret"`
 	WeCom          bool   `json:"wecom"`
 	WeComWebhook   string `json:"wecom_webhook"`
 	Bark           bool   `json:"bark"`
@@ -89,39 +95,62 @@ func (s *NoticeService) ReloadFromJSON(settingsJSON string) {
 	}
 	var ns noticeSettings
 	if err := json.Unmarshal([]byte(settingsJSON), &ns); err != nil {
-		s.log.Warn("parse notice settings failed", zap.Error(err))
+		s.warn("parse notice settings failed", zap.Error(err))
 		return
 	}
 
+	providers := s.providersFromSettings(ns)
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.providers = providers
+	s.mu.Unlock()
 
-	s.providers = nil
-	if ns.Feishu && ns.FeishuWebhook != "" {
-		s.providers = append(s.providers, notice.NewFeishuNotifier(ns.FeishuWebhook, ns.FeishuSecret))
+	s.info("notice providers reloaded", zap.Int("count", len(providers)), zap.Strings("providers", providerNames(providers)))
+}
+
+func (s *NoticeService) providersFromSettings(ns noticeSettings) []notice.Notifier {
+	providers := make([]notice.Notifier, 0, 8)
+	s.addProvider(&providers, ns.Feishu, "feishu", map[string]string{"webhook": ns.FeishuWebhook}, func() notice.Notifier {
+		return notice.NewFeishuNotifier(ns.FeishuWebhook, ns.FeishuSecret)
+	})
+	s.addProvider(&providers, ns.Telegram, "telegram", map[string]string{"bot_token": ns.TgToken, "chat_id": ns.TgChat}, func() notice.Notifier {
+		return notice.NewTelegramNotifier(ns.TgToken, ns.TgChat)
+	})
+	s.addProvider(&providers, ns.Dingtalk, "dingtalk", map[string]string{"webhook": ns.DingWebhook}, func() notice.Notifier {
+		return notice.NewDingtalkNotifier(ns.DingWebhook, ns.DingSecret)
+	})
+	s.addProvider(&providers, ns.WeCom, "wecom", map[string]string{"webhook": ns.WeComWebhook}, func() notice.Notifier {
+		return notice.NewWeComNotifier(ns.WeComWebhook)
+	})
+	s.addProvider(&providers, ns.Bark, "bark", map[string]string{"key": ns.BarkKey}, func() notice.Notifier {
+		return notice.NewBarkNotifier(ns.BarkKey, ns.BarkEndpoint)
+	})
+	s.addProvider(&providers, ns.Discord, "discord", map[string]string{"webhook": ns.DiscordWebhook}, func() notice.Notifier {
+		return notice.NewDiscordNotifier(ns.DiscordWebhook)
+	})
+	s.addProvider(&providers, ns.Email, "email", map[string]string{"host": ns.EmailHost, "to": ns.EmailTo}, func() notice.Notifier {
+		return notice.NewEmailNotifier(ns.EmailHost, ns.EmailPort, ns.EmailUser, ns.EmailPass, ns.EmailFrom, ns.EmailTo)
+	})
+	s.addProvider(&providers, ns.Webhook, "webhook", map[string]string{"url": ns.WebhookURL}, func() notice.Notifier {
+		return notice.NewWebhookNotifier(ns.WebhookURL, ns.WebhookSecret)
+	})
+	return providers
+}
+
+func (s *NoticeService) addProvider(providers *[]notice.Notifier, enabled bool, name string, required map[string]string, create func() notice.Notifier) {
+	if !enabled {
+		return
 	}
-	if ns.Telegram && ns.TgToken != "" && ns.TgChat != "" {
-		s.providers = append(s.providers, notice.NewTelegramNotifier(ns.TgToken, ns.TgChat))
+	missing := make([]string, 0, len(required))
+	for key, value := range required {
+		if strings.TrimSpace(value) == "" {
+			missing = append(missing, key)
+		}
 	}
-	if ns.Dingtalk && ns.DingWebhook != "" {
-		s.providers = append(s.providers, notice.NewDingtalkNotifier(ns.DingWebhook, ns.DingSecret))
+	if len(missing) > 0 {
+		s.warn("notice provider enabled but incomplete", zap.String("provider", name), zap.Strings("missing", missing))
+		return
 	}
-	if ns.WeCom && ns.WeComWebhook != "" {
-		s.providers = append(s.providers, notice.NewWeComNotifier(ns.WeComWebhook))
-	}
-	if ns.Bark && ns.BarkKey != "" {
-		s.providers = append(s.providers, notice.NewBarkNotifier(ns.BarkKey, ns.BarkEndpoint))
-	}
-	if ns.Discord && ns.DiscordWebhook != "" {
-		s.providers = append(s.providers, notice.NewDiscordNotifier(ns.DiscordWebhook))
-	}
-	if ns.Email && ns.EmailHost != "" && ns.EmailTo != "" {
-		s.providers = append(s.providers, notice.NewEmailNotifier(ns.EmailHost, ns.EmailPort, ns.EmailUser, ns.EmailPass, ns.EmailFrom, ns.EmailTo))
-	}
-	if ns.Webhook && ns.WebhookURL != "" {
-		s.providers = append(s.providers, notice.NewWebhookNotifier(ns.WebhookURL, ns.WebhookSecret))
-	}
-	s.log.Info("notice providers reloaded", zap.Int("count", len(s.providers)))
+	*providers = append(*providers, create())
 }
 
 func (s *NoticeService) SendLoginEvent(ctx context.Context, success bool, ip string) {
@@ -134,24 +163,71 @@ func (s *NoticeService) SendLoginEvent(ctx context.Context, success bool, ip str
 }
 
 func (s *NoticeService) SendSuffixChanged(ctx context.Context, newSuffix, baseURL string) {
-	msg := fmt.Sprintf("【短链系统】管理后缀已更换\n新入口: %s/%s/\n时间: %s", baseURL, newSuffix, nowStr())
+	entry := suffixEntry(baseURL, newSuffix)
+	msg := fmt.Sprintf("【短链系统】管理后缀已更换\n新入口: %s\n时间: %s", entry, nowStr())
 	s.broadcast(ctx, msg)
 }
 
 func (s *NoticeService) SendSuffixInfo(ctx context.Context, suffix, baseURL string) {
-	msg := fmt.Sprintf("【短链系统】当前管理后缀\n入口: %s/%s/\n时间: %s", baseURL, suffix, nowStr())
+	entry := suffixEntry(baseURL, suffix)
+	msg := fmt.Sprintf("【短链系统】当前管理后缀\n入口: %s\n时间: %s", entry, nowStr())
 	s.broadcast(ctx, msg)
 }
 
 func (s *NoticeService) broadcast(ctx context.Context, msg string) {
 	s.mu.RLock()
-	providers := s.providers
+	providers := append([]notice.Notifier(nil), s.providers...)
 	s.mu.RUnlock()
 
+	if len(providers) == 0 {
+		s.info("notice skipped: no providers enabled")
+		return
+	}
+
+	var wg sync.WaitGroup
+	for _, provider := range providers {
+		p := provider
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sendCtx, cancel := context.WithTimeout(ctx, noticeSendTimeout)
+			defer cancel()
+			if err := p.Send(sendCtx, msg); err != nil {
+				s.warn("send notice failed", zap.String("provider", p.Name()), zap.Error(err))
+				return
+			}
+			s.info("notice sent", zap.String("provider", p.Name()))
+		}()
+	}
+	wg.Wait()
+}
+
+func suffixEntry(baseURL, suffix string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	suffix = strings.Trim(strings.TrimSpace(suffix), "/")
+	if baseURL == "" {
+		return "/" + suffix + "/"
+	}
+	return baseURL + "/" + suffix + "/"
+}
+
+func providerNames(providers []notice.Notifier) []string {
+	names := make([]string, 0, len(providers))
 	for _, p := range providers {
-		if err := p.Send(ctx, msg); err != nil {
-			s.log.Warn("send notice failed", zap.String("provider", p.Name()), zap.Error(err))
-		}
+		names = append(names, p.Name())
+	}
+	return names
+}
+
+func (s *NoticeService) warn(msg string, fields ...zap.Field) {
+	if s != nil && s.log != nil {
+		s.log.Warn(msg, fields...)
+	}
+}
+
+func (s *NoticeService) info(msg string, fields ...zap.Field) {
+	if s != nil && s.log != nil {
+		s.log.Info(msg, fields...)
 	}
 }
 

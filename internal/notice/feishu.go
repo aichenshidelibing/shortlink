@@ -62,7 +62,7 @@ func (f *FeishuNotifier) genSign(timestamp int64) string {
 		return ""
 	}
 	stringToSign := fmt.Sprintf("%d\n%s", timestamp, f.secret)
-	h := hmac.New(sha256.New, []byte(f.secret))
-	h.Write([]byte(stringToSign))
+	h := hmac.New(sha256.New, []byte(stringToSign))
+	h.Write(nil)
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }

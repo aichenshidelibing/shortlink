@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -27,9 +28,15 @@ func (d *DingtalkNotifier) Name() string {
 
 func (d *DingtalkNotifier) Send(ctx context.Context, message string) error {
 	timestamp := time.Now().UnixMilli()
-	sign := d.genSign(timestamp)
-
-	url := fmt.Sprintf("%s&timestamp=%d&sign=%s", d.webhook, timestamp, sign)
+	url := d.webhook
+	if d.secret != "" {
+		sign := d.genSign(timestamp)
+		sep := "&"
+		if !strings.Contains(url, "?") {
+			sep = "?"
+		}
+		url = fmt.Sprintf("%s%stimestamp=%d&sign=%s", url, sep, timestamp, sign)
+	}
 	payload := map[string]interface{}{
 		"msgtype": "text",
 		"text": map[string]string{
