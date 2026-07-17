@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Shortlink Admin</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus@2.4.4/dist/index.css">
+<style>
+
+:root{--bg:#eef4ff;--card:#fbfdff;--panel:#ffffff;--border:#dce7f6;--text:#152033;--t2:#53647c;--t3:#8a98ad;--accent:#3157ff;--accent2:#00a7c8;--danger:#dd3b4a;--success:#16a36a;--warn:#d98705;--sidebar-bg:#07101e;--sidebar-hover:rgba(49,87,255,.10);--sidebar-active:rgba(49,87,255,.18);--r:20px;--shadow:0 20px 60px rgba(28,59,118,.13),0 2px 10px rgba(15,23,42,.05)}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+.lw{display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#07101e,#0c1b32 60%,#10294a);position:relative;overflow:hidden}.lw::before{content:'';position:absolute;inset:-20%;background:linear-gradient(115deg,transparent 0 18%,rgba(49,87,255,.14) 18% 18.3%,transparent 18.3% 38%,rgba(0,167,200,.12) 38% 38.3%,transparent 38.3%);transform:rotate(-8deg)}.lw::after{content:'';position:absolute;width:620px;height:620px;border-radius:50%;right:-190px;top:-190px;background:radial-gradient(circle,rgba(49,87,255,.22),transparent 64%)}.lb{background:linear-gradient(180deg,rgba(17,28,48,.94),rgba(12,22,39,.88));border-radius:30px;padding:46px 42px;width:430px;box-shadow:0 28px 80px rgba(0,0,0,.38);border:1px solid rgba(255,255,255,.1);position:relative;z-index:1;backdrop-filter:blur(20px)}.lb::before{content:'CONTROL ACCESS';display:block;color:#6ea8ff;font-size:11px;font-weight:900;letter-spacing:2px;margin-bottom:14px}.lb h2{text-align:left;font-size:28px;color:#f8fbff;font-weight:950;margin-bottom:6px;letter-spacing:-.8px}.lb .sub{text-align:left;color:#8ca0bd;font-size:13px;margin-bottom:30px}.lb .fi{margin-bottom:16px}.lb .fi label{display:block;font-size:11px;font-weight:900;color:#8ca0bd;margin-bottom:7px;text-transform:uppercase;letter-spacing:1px}.lb input{width:100%;padding:14px 16px;border-radius:16px;border:1.5px solid #26354d;font-size:14px;outline:none;background:#0c1627;color:#f1f5f9;transition:.18s}.lb input:focus{border-color:#5b7cff;box-shadow:0 0 0 4px rgba(49,87,255,.18)}.lb .btn{width:100%;padding:15px;border-radius:17px;border:none;background:linear-gradient(135deg,#3157ff,#1f3edb 60%,#101b6b);color:#fff;font-size:15px;font-weight:900;cursor:pointer;transition:.18s;margin-top:8px;box-shadow:0 16px 34px rgba(49,87,255,.28)}.lb .btn:hover{transform:translateY(-2px)}.lb .err{color:#ff8791;font-size:13px;text-align:center;margin-top:12px;min-height:20px}html[data-theme="light"] .lw{background:linear-gradient(135deg,#eaf1ff 0%,#f8fbff 52%,#edf7ff 100%)}html[data-theme="light"] .lw::before{background:linear-gradient(115deg,transparent 0 18%,rgba(49,87,255,.08) 18% 18.3%,transparent 18.3% 38%,rgba(0,167,200,.08) 38% 38.3%,transparent 38.3%)}html[data-theme="light"] .lw::after{background:radial-gradient(circle,rgba(49,87,255,.14),transparent 64%)}html[data-theme="light"] .lb{background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(247,250,255,.91));border-color:rgba(255,255,255,.82);box-shadow:0 28px 80px rgba(28,59,118,.18),0 2px 10px rgba(15,23,42,.06)}html[data-theme="light"] .lb::before{color:#3157ff}html[data-theme="light"] .lb h2{color:#0b1220}html[data-theme="light"] .lb .sub{color:#53647c}html[data-theme="light"] .lb .fi label{color:#53647c}html[data-theme="light"] .lb input{background:#f7faff;border-color:#dce7f6;color:#152033}html[data-theme="light"] .lb input:focus{background:#fff;border-color:#3157ff;box-shadow:0 0 0 4px rgba(49,87,255,.12)}html[data-theme="light"] .lb .err{color:#be2434}
+.lo{display:flex;height:100vh}.sb{width:282px;background:linear-gradient(180deg,#07101e,#0b1628 62%,#050a12);display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid rgba(255,255,255,.08);box-shadow:22px 0 60px rgba(15,23,42,.16);position:relative;z-index:3}.sb::after{content:'';position:absolute;right:0;top:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent,#3157ff,transparent);opacity:.4}.sb-brand{padding:26px 24px 22px;display:grid;grid-template-columns:44px 1fr;gap:13px;align-items:center;border-bottom:1px solid rgba(255,255,255,.08)}.sb-brand .logo{width:44px;height:44px;border-radius:16px;background:conic-gradient(from 210deg,#3157ff,#7c3aed,#00a7c8,#3157ff);display:flex;align-items:center;justify-content:center;font-size:19px;color:#fff;font-weight:950;box-shadow:0 14px 34px rgba(49,87,255,.38)}.sb-brand .name{color:#f8fbff;font-size:17px;font-weight:900;letter-spacing:-.3px}.sb-brand .ver{grid-column:2;color:#9ab6ff;font-size:10px;font-weight:900;background:rgba(49,87,255,.16);padding:3px 8px;border-radius:999px;width:max-content;margin-top:-5px}.sb-nav{flex:1;padding:18px 13px;overflow-y:auto}.sb-section{color:#52647e;font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:1.7px;padding:18px 13px 8px}.sb-item{padding:11px 14px;color:#96a7bf;cursor:pointer;display:flex;align-items:center;gap:12px;font-size:13px;font-weight:750;transition:.15s;border-radius:14px;margin-bottom:4px;position:relative}.sb-item:hover{background:var(--sidebar-hover);color:#e8eef8}.sb-item.on{background:linear-gradient(90deg,rgba(49,87,255,.24),rgba(0,167,200,.08));color:#fff}.sb-item.on::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;background:#6ea8ff;border-radius:0 4px 4px 0}.sb-item .icon{width:20px;text-align:center;font-size:15px}.sb-item .badge{background:var(--danger);color:#fff;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:900;margin-left:auto}.sb-foot{padding:16px;border-top:1px solid rgba(255,255,255,.08)}.sb-foot button{width:100%;padding:11px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.03);color:#96a7bf;cursor:pointer;font-size:12px;font-weight:800;transition:.15s}.sb-foot button:hover{color:#ff8791;border-color:rgba(255,135,145,.28);background:rgba(255,135,145,.06)}
+.mn{flex:1;overflow:auto;padding:34px 42px;background:linear-gradient(135deg,#eef4ff,#f8fbff 52%,#edf7ff);position:relative}.mn::before{content:'';position:fixed;inset:0 0 0 282px;background:linear-gradient(115deg,transparent 0 22%,rgba(49,87,255,.06) 22% 22.25%,transparent 22.25% 48%,rgba(0,167,200,.05) 48% 48.25%,transparent 48.25%);pointer-events:none}.mn>*{position:relative}.mn h2{font-size:28px;font-weight:950;color:#0b1220;margin-bottom:6px;letter-spacing:-.9px}.mn .page-desc{color:var(--t2);font-size:13px;margin-bottom:28px}.top-tools,.login-tools{z-index:20;display:flex;justify-content:flex-end;gap:10px;align-items:center;padding:6px;border:1px solid rgba(255,255,255,.56);background:rgba(255,255,255,.46);backdrop-filter:blur(22px) saturate(150%);border-radius:999px;box-shadow:0 18px 44px rgba(28,59,118,.14),inset 0 1px 0 rgba(255,255,255,.5)}.top-tools{position:relative;margin:0 0 18px auto;width:max-content}.login-tools{position:fixed;top:18px;right:18px}select.tool-select{height:38px;padding:0 38px 0 16px;border-radius:999px;border:1px solid rgba(49,87,255,.16);background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(241,246,255,.9));color:#152033;font-size:12px;font-weight:900;outline:none;box-shadow:0 8px 22px rgba(15,23,42,.07);cursor:pointer;appearance:none;-webkit-appearance:none;background-image:none!important;transition:transform .16s,box-shadow .16s,border-color .16s}select.tool-select:hover{transform:translateY(-1px);border-color:rgba(49,87,255,.34);box-shadow:0 12px 28px rgba(49,87,255,.12)}select.tool-select:focus{box-shadow:0 0 0 3px rgba(49,87,255,.18),0 12px 28px rgba(49,87,255,.12)}select.tool-select option{background:#fff;color:#152033;font-weight:800}.tool-input{height:38px;padding:0 14px;border-radius:999px;border:1px solid rgba(49,87,255,.16);background:#f7faff;color:#152033;font-size:13px;font-weight:800;outline:none;box-shadow:0 8px 22px rgba(15,23,42,.07);background-image:none!important}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-bottom:28px}.stat{background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(247,250,255,.9));border-radius:22px;padding:24px;border:1px solid rgba(255,255,255,.78);box-shadow:var(--shadow);position:relative;overflow:hidden;transition:.18s}.stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent);opacity:.85}.stat:hover{transform:translateY(-2px)}.stat .icon-bg{position:absolute;top:-12px;right:-12px;width:76px;height:76px;border-radius:50%;opacity:.08}.stat .val{font-size:34px;font-weight:950;color:#0b1220;letter-spacing:-1.2px}.stat .lbl{color:var(--t2);font-size:12px;font-weight:750;margin-top:5px}.stat.accent::before{background:var(--accent)}.stat.success::before{background:var(--success)}.stat.danger::before{background:var(--danger)}.stat.warn::before{background:var(--warn)}.stat.accent .val{color:var(--accent)}.stat.success .val{color:var(--success)}.stat.danger .val{color:var(--danger)}.stat.warn .val{color:var(--warn)}
+.panel,.sec-card{background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(247,250,255,.9));border-radius:22px;padding:24px;border:1px solid rgba(255,255,255,.78);box-shadow:var(--shadow);backdrop-filter:blur(14px)}.panel{margin-bottom:20px}.panel-header,.sec-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.panel-title,.sec-card-title{font-size:15px;font-weight:900;color:#0b1220;display:flex;align-items:center;gap:8px}.panel-title .dot{width:8px;height:8px;border-radius:50%}.sec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:20px}.sec-card-status{font-size:11px;font-weight:900;padding:4px 10px;border-radius:999px}.sec-card-status.ok{background:#dff8ea;color:#087445}.sec-card-status.warn{background:#fff0c7;color:#9a5b00}.sec-card-status.off{background:#edf2f7;color:#64748b}.sec-card-body{display:flex;flex-direction:column;gap:10px}.sec-metric{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;background:#f2f7ff;border:1px solid rgba(220,231,246,.8);border-radius:14px}.sec-metric .k{font-size:12px;color:var(--t2)}.sec-metric .v{font-size:13px;font-weight:850;color:#0b1220;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.sec-bar{height:8px;background:#dbe6f5;border-radius:999px;overflow:hidden;margin-top:4px}.sec-bar-fill{height:100%;border-radius:999px;transition:width .6s ease}
+table{width:100%;border-collapse:separate;border-spacing:0;background:rgba(255,255,255,.9);border-radius:22px;overflow:hidden;border:1px solid rgba(255,255,255,.78);box-shadow:var(--shadow)}th{background:#f2f7ff;padding:13px 16px;text-align:left;font-weight:900;font-size:11px;color:var(--t2);text-transform:uppercase;letter-spacing:.7px;border-bottom:1px solid var(--border)}td{padding:13px 16px;border-bottom:1px solid #edf2f7;font-size:13px;color:var(--text)}tr:last-child td{border-bottom:none}tr:hover td{background:#f8fbff}.tag{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:850;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#eaf0ff;color:var(--accent)}
+.btn1{padding:10px 20px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--accent),#1f3edb);color:#fff;font-size:13px;font-weight:900;cursor:pointer;transition:.15s;box-shadow:0 12px 28px rgba(49,87,255,.22)}.btn1:hover{transform:translateY(-1px)}.btn2{padding:8px 16px;border-radius:13px;border:none;background:#fff0f1;color:#be2434;font-size:12px;font-weight:900;cursor:pointer}.btn3{padding:9px 16px;border-radius:13px;border:1.5px solid var(--border);background:#fff;color:var(--text);font-size:12px;font-weight:850;cursor:pointer}.btn3:hover{border-color:var(--accent);color:var(--accent)}.btn4{padding:9px 16px;border-radius:13px;border:none;background:#eef2f7;color:var(--t2);font-size:12px;font-weight:850;cursor:pointer}.section{font-size:14px;font-weight:950;color:#0b1220;margin:30px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}.frow{display:flex;gap:16px;flex-wrap:wrap}.frow .fi{flex:1;min-width:210px;margin-bottom:16px}.fi label{display:block;font-size:11px;font-weight:900;color:var(--t2);margin-bottom:7px;text-transform:uppercase;letter-spacing:.8px}.ttl-pills{display:flex;gap:8px;flex-wrap:wrap}.ttl-pill{padding:8px 12px;border:1.5px solid var(--border);border-radius:999px;background:#fff;color:var(--text);font-size:12px;font-weight:850;cursor:pointer}.ttl-pill.on{background:var(--accent);border-color:var(--accent);color:#fff}.hint{font-size:12px;color:var(--t3);line-height:1.6;margin-top:6px}.fi input,.fi select{width:100%;padding:12px 14px;border-radius:15px;border:1.5px solid var(--border);background:#f7faff;font-size:13px;outline:none;transition:.15s;color:var(--text)}.fi input:focus,.fi select:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(49,87,255,.1);background:#fff}.alert{padding:14px 18px;border-radius:16px;font-size:12px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-weight:750}.alert-info{background:#eaf4ff;color:#194185;border:1px solid #bfdbfe}.captcha-lab{position:relative;padding:18px;border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));border-radius:22px;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(242,247,255,.82));box-shadow:inset 0 1px 0 rgba(255,255,255,.7);margin-bottom:16px;overflow:hidden}.captcha-lab::before{content:'CAP';position:absolute;right:18px;top:8px;font-size:46px;font-weight:950;color:rgba(49,87,255,.07);letter-spacing:-3px}.captcha-lab .lab-title{font-size:14px;font-weight:950;color:#0b1220;margin-bottom:5px}.captcha-lab .lab-copy{font-size:12px;color:var(--t2);line-height:1.6;max-width:620px}.captcha-lab .lab-pill{display:inline-flex;margin-top:10px;padding:5px 10px;border-radius:999px;background:#eaf0ff;color:var(--accent);font-size:11px;font-weight:950;border:1px solid rgba(49,87,255,.14)}html[data-theme="dark"] .captcha-lab{background:linear-gradient(135deg,rgba(17,28,48,.92),rgba(12,22,39,.82));border-color:#26354d}html[data-theme="dark"] .captcha-lab .lab-title{color:#f8fbff}.report-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:17px 20px;margin-bottom:10px;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:20px;border:1px solid rgba(255,255,255,.78);box-shadow:0 10px 30px rgba(15,23,42,.06)}.report-row .ri{flex:1}.report-row .ri .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:900;color:var(--accent);margin-bottom:3px}.report-row .ra{display:flex;gap:8px}.empty{text-align:center;padding:60px 20px;color:var(--t3)}.empty .icon{font-size:48px;margin-bottom:12px;opacity:.55}.totp-setup{display:flex;gap:24px;align-items:flex-start;background:linear-gradient(180deg,#fff,#f8fbff);border:1px solid rgba(255,255,255,.78);border-radius:22px;padding:22px;margin-bottom:24px;box-shadow:var(--shadow)}.totp-box{min-width:124px;min-height:124px;background:#f7faff;border-radius:18px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}.totp-actions{flex:1}.totp-status{display:inline-block;margin-top:8px;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:900}.totp-status.on{background:#dff8ea;color:#087445}.totp-status.off{background:#fff0c7;color:#9a5b00}
+html[data-theme="light"]{color-scheme:light;--bg:#eef4ff;--card:#fbfdff;--panel:#fff;--border:#dce7f6;--text:#152033;--t2:#53647c;--t3:#8a98ad}html[data-theme="light"] body{background:var(--bg);color:var(--text)}html[data-theme="light"] .sb{background:linear-gradient(180deg,#ffffff,#f8fbff);border-right:1px solid var(--border)}html[data-theme="light"] .sb-brand{border-bottom:1px solid var(--border)}html[data-theme="light"] .sb-brand .name{color:#0b1220}html[data-theme="light"] .sb-section{color:#8a98ad}html[data-theme="light"] .sb-item{color:#53647c}html[data-theme="light"] .sb-item:hover{background:#f2f7ff;color:#152033}html[data-theme="light"] .sb-item.on{background:#eaf0ff;color:#3157ff}html[data-theme="light"] .sb-foot{border-top:1px solid var(--border)}html[data-theme="light"] .sb-foot button{border-color:var(--border);color:#53647c;background:#fff}html[data-theme="light"] .mn{background:linear-gradient(135deg,#eef4ff,#f8fbff 52%,#edf7ff)}
+html[data-theme="dark"]{color-scheme:dark;--bg:#07101e;--card:#111c30;--panel:#111c30;--border:#26354d;--text:#e8eef8;--t2:#a8b4c7;--t3:#65758d;--sidebar-bg:#050a12;--shadow:0 22px 70px rgba(0,0,0,.36)}html[data-theme="dark"] body{background:var(--bg);color:var(--text)}html[data-theme="dark"] .mn{background:linear-gradient(135deg,#07101e,#0c1627 54%,#0d1b2f)}html[data-theme="dark"] .mn::before{opacity:.55}html[data-theme="dark"] .mn h2,html[data-theme="dark"] .panel-title,html[data-theme="dark"] .sec-card-title,html[data-theme="dark"] .section{color:#f8fbff}html[data-theme="dark"] .panel,html[data-theme="dark"] .sec-card,html[data-theme="dark"] .stat,html[data-theme="dark"] .totp-setup,html[data-theme="dark"] table{background:linear-gradient(180deg,rgba(17,28,48,.96),rgba(12,22,39,.92));border-color:#26354d}html[data-theme="dark"] .sec-metric,html[data-theme="dark"] th,html[data-theme="dark"] .fi input,html[data-theme="dark"] .fi select,html[data-theme="dark"] select.tool-select,html[data-theme="dark"] .tool-input,html[data-theme="dark"] .totp-box{background:#0c1627;color:#e8eef8;border-color:#26354d}html[data-theme="dark"] td{border-color:#1d2a40}html[data-theme="dark"] tr:hover td{background:#0c1627}html[data-theme="dark"] .btn3{background:#111c30;color:#e8eef8;border-color:#26354d}html[data-theme="dark"] .btn4{background:#0c1627;color:#a8b4c7}html[data-theme="dark"] .tag{background:#16264a;color:#bcd0ff}html[data-theme="dark"] .stat .val,html[data-theme="dark"] .sec-metric .v{color:#f8fbff}html[data-theme="dark"] .lb{background:linear-gradient(180deg,rgba(17,28,48,.94),rgba(12,22,39,.9));border-color:#26354d}html[data-theme="dark"] #qr-totp{background:#0c1627!important}html[data-theme="dark"] .top-tools,html[data-theme="dark"] .login-tools{border-color:rgba(123,154,255,.24);background:rgba(7,16,30,.54);box-shadow:0 18px 44px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.06)}html[data-theme="dark"] select.tool-select{border-color:rgba(123,154,255,.26);color:#f8fbff;box-shadow:0 10px 26px rgba(0,0,0,.24)}html[data-theme="dark"] select.tool-select:hover{border-color:rgba(123,154,255,.48);box-shadow:0 14px 34px rgba(0,0,0,.3)}html[data-theme="dark"] select.tool-select option{background:#111c30;color:#f8fbff}
+@media(max-width:768px){.sb{width:64px}.sb-brand{grid-template-columns:1fr;padding:18px 10px}.sb-brand .name,.sb-brand .ver,.sb-section,.sb-item span:not(.icon):not(.badge){display:none}.sb-item{justify-content:center;padding:12px}.mn{padding:20px}.mn::before{left:64px}.totp-setup{flex-direction:column}.frow{flex-direction:column;gap:0}}
+
+</style>
+</head>
+<body><div id="app"></div>
+<script src="https://unpkg.com/vue@3.4/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus@2.4.4/dist/index.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const { createApp, ref, reactive, computed, nextTick, onMounted } = Vue;
+const { ElMessage, ElMessageBox } = ElementPlus;
+const _base = window.location.pathname.split('/')[1] || '';
+function b(path) { return _base ? '/' + _base + path : path; }
+async function api(path, opts = {}) {
+  const h = {}; if (opts.body && typeof opts.body === 'string') h['Content-Type'] = 'application/json';
+  const r = await fetch(path, { ...opts, headers: h });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'request failed');
+  return j.data || j;
+}
+
+const LABELS={
+  zh:{overview:'概览',manage:'管理',security:'安全',system:'系统',dashboard:'数据总览',status:'系统状态',links:'短链管理',reports:'举报审核',apikeys:'API Keys',securityCenter:'安全中心',settings:'系统设置',logout:'🚪 退出登录',loginSub:'管理后台 · 请输入管理员凭据',username:'用户名',password:'密码',totp:'TOTP 验证码',login:'登 录',verifying:'验证中…',dashboardDesc:'实时查看系统运行数据',statusDesc:'服务运行指标与健康检测',totalLinks:'短链总数',totalClicks:'总点击量',pendingReports:'待处理举报',activeBans:'活跃封禁',systemHealth:'系统健康',totpTitle:'TOTP 双重认证',totpDesc:'请先用 Authenticator 扫描二维码，再输入 6 位动态验证码确认启用。验证成功后，下次登录才会要求动态验证码。',totpEnabled:'已启用',totpPending:'待验证',totpInput:'输入 6 位验证码',totpVerify:'验证并启用',totpVerifying:'验证中…'},
+  en:{overview:'Overview',manage:'Manage',security:'Security',system:'System',dashboard:'Dashboard',status:'System status',links:'Links',reports:'Reports',apikeys:'API Keys',securityCenter:'Security Center',settings:'Settings',logout:'🚪 Logout',loginSub:'Admin console · Enter credentials',username:'Username',password:'Password',totp:'TOTP code',login:'Login',verifying:'Verifying…',dashboardDesc:'Realtime service metrics',statusDesc:'Runtime health and diagnostics',totalLinks:'Total links',totalClicks:'Total clicks',pendingReports:'Pending reports',activeBans:'Active bans',systemHealth:'System health',totpTitle:'TOTP two-factor authentication',totpDesc:'Scan the QR code with an authenticator app, then enter the 6-digit code to confirm. TOTP is required at login only after verification succeeds.',totpEnabled:'Enabled',totpPending:'Pending verification',totpInput:'Enter 6-digit code',totpVerify:'Verify and enable',totpVerifying:'Verifying…'}
+};
+function applyTheme(mode){const m=mode==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):mode;document.documentElement.setAttribute('data-theme',m);document.body.setAttribute('data-theme',m);document.documentElement.style.colorScheme=m;localStorage.setItem('sl_admin_theme',mode)}
+function applyLang(lang){localStorage.setItem('sl_admin_lang',lang);document.documentElement.lang=lang==='en'?'en':'zh-CN'}
+function setFavicon(url){if(!url)return;let l=document.querySelector('link[rel="icon"]');if(!l){l=document.createElement('link');l.rel='icon';document.head.appendChild(l)}l.href=url}
+
+let adminCFKey='', adminCFRendered=false, adminCaptchaCfg={enabled:false,capEndpoint:''}, adminCapToken='',adminTurnstileLoading=false;
+window.CAP_CUSTOM_WASM_URL='/cap/assets/cap_wasm_bg.wasm';window.CAP_DISABLE_WIDGET_REF=true;
+function onAdminTurnstileReady(){renderAdminTurnstile()}
+function ensureAdminTurnstileScript(){if(!adminCFKey||document.getElementById('admin-turnstile-script')||adminTurnstileLoading)return;adminTurnstileLoading=true;const s=document.createElement('script');s.id='admin-turnstile-script';s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onAdminTurnstileReady';s.async=true;s.defer=true;s.onload=()=>{adminTurnstileLoading=false;renderAdminTurnstile()};s.onerror=()=>{adminTurnstileLoading=false};document.head.appendChild(s)}
+function renderAdminTurnstile(){if(!adminCFKey||!window.turnstile||adminCFRendered)return;try{turnstile.render('#admin-cf-widget',{sitekey:adminCFKey});adminCFRendered=true}catch(e){}}
+function ensureAdminCapScript(){if(document.getElementById('admin-cap-widget-script'))return;const s=document.createElement('script');s.id='admin-cap-widget-script';s.type='module';s.src='/cap/assets/widget.js';s.onerror=()=>{s.src='https://cdn.jsdelivr.net/npm/@cap.js/widget'};document.head.appendChild(s)}
+function renderAdminCap(){if(!adminCaptchaCfg.enabled||!adminCaptchaCfg.capEndpoint)return;ensureAdminCapScript();const w=document.getElementById('admin-cap-widget');if(!w)return;w.setAttribute('data-cap-api-endpoint',adminCaptchaCfg.capEndpoint);w.setAttribute('data-cap-worker-count','1');w.setAttribute('data-cap-i18n-initial-state','确认你是真人');w.setAttribute('data-cap-i18n-verifying-label','正在验证...');w.setAttribute('data-cap-i18n-solved-label','已验证');w.addEventListener('solve',e=>{adminCapToken=e.detail?.token||e.detail||getAdminCapToken()})}
+function getAdminCapToken(){return adminCapToken||document.querySelector('#admin-cap-widget input[name="cap-token"]')?.value||document.querySelector('[name="cap-token"]')?.value||''}
+
+
+createApp({
+  setup() {
+    const isLogin = ref(false), cp = ref('dashboard'), loading = ref(false);
+    const lu = ref(''), lp = ref(''), lt = ref(''), le = ref(''), cfLoginEnabled = ref(false), captchaLoginEnabled = ref(false);
+    const dash = reactive({ tl: 0, tc: 0, pr: 0, ab: 0 });
+    const st = reactive({ db: '...', redis: '...', uptime: '', goroutines: 0, mem_alloc: 0, mem_heap: 0, mem_sys: 0, mem_stack: 0, num_gc: 0, last_gc_seconds: -1, go_version: '', version: '', suffix: '', cpu_count: 0, container_mem: 0, container_limit: 0, container_pct: 0, container_limit_known: false, host_total: 0, host_used: 0, host_avail: 0, host_pct: 0, load1: '-', load5: '-', load15: '-', disk_total: 0, disk_used: 0, disk_free: 0, disk_pct: 0 });
+    const links = ref([]), keys = ref([]), bans = ref([]), reports = ref([]), auditLogs = ref([]), domains = ref([]);
+    const totpUri = ref(''), totpCode = ref(''), totpVerified = ref(false), totpLoading = ref(false);
+    const s = reactive({
+      suffix: '', shortlink_length: 6,
+      cf_enabled: false, cf_site_key: '', cf_secret_key: '',
+      captcha_enabled: false, captcha_provider: 'cap', captcha_mode: 'adaptive', captcha_normal_provider: 'cap', captcha_escalation_provider: 'turnstile', captcha_failure_threshold: 3, captcha_risk_window_seconds: 600, cap_site_key: '', cap_api_endpoint: '', cap_secret_key: '', cap_verify_url: '', playcaptcha_enabled: false, playcaptcha_site_key: '', playcaptcha_secret_key: '', playcaptcha_endpoint: '',
+      feishu: false, feishu_webhook: '', feishu_secret: '',
+      telegram: false, tg_token: '', tg_chat: '',
+      dingtalk: false, ding_webhook: '', ding_secret: '',
+      rate_create: 10, rate_redirect: 60,
+      bg_url: '', bg_type: 'image',
+      mod_enabled: false, mod_openai_key: '', mod_auto_delete: false,
+      bot_mode: 'off', bot_min_trust: 0.7, bot_min_reports: 5, bot_max_auto_daily: 100,
+      report_daily_limit: 20, report_min_interval: 5,
+      version: 'BETA2.0-ALPHA', favicon_url: '', public_messages: [],
+      ttl_default_seconds: 0, ttl_max_seconds: 31536000, ttl_allow_never: true, ttl_options_selected: [0,3600,86400,604800,2592000], ttl_custom_default: 3600, ttl_custom_max: 31536000,
+      domain_allowlist: '', domain_blocklist: '', risk_interstitial_enabled: true, risk_interstitial_threshold: 50, risk_block_threshold: 85,
+      qr_show_direct: true, qr_allow_user_customize: false, qr_default_template: 'classic', qr_default_text: '', qr_logo_enabled: false, qr_logo_url: '',
+    });
+    const appVersion = ref('');
+	    const themeMode = ref(localStorage.getItem('sl_admin_theme') || 'system');
+	    const lang = ref(localStorage.getItem('sl_admin_lang') || 'zh');
+	    applyTheme(themeMode.value); applyLang(lang.value);
+	    const setThemeMode = (m) => { themeMode.value=m; applyTheme(m); };
+	    const tt = (k) => (LABELS[lang.value] && LABELS[lang.value][k]) || LABELS.zh[k] || k;
+	    const setLang = (l) => { lang.value=l; applyLang(l); };
+	    if (window.matchMedia) matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{if(themeMode.value==='system')applyTheme('system')});
+		    fetch('/api/config').then(r=>r.json()).then(j=>{const d=j.data||{}; if(d.cf_enabled&&d.cf_site_key){cfLoginEnabled.value=true; adminCFKey=d.cf_site_key; nextTick(()=>{ensureAdminTurnstileScript();renderAdminTurnstile()})} if(d.captcha_enabled&&d.captcha_provider==='cap'&&d.cap_api_endpoint){captchaLoginEnabled.value=true; adminCaptchaCfg={enabled:true,capEndpoint:d.cap_api_endpoint}; nextTick(renderAdminCap)}}).catch(()=>{});
+
+    const doLogin = async () => {
+      le.value = ''; loading.value = true;
+      try {
+        const cf=document.querySelector('#admin-cf-widget [name="cf-turnstile-response"]')?.value||'';
+        const cap=getAdminCapToken();
+        await api(b('/api/login'), { method: 'POST', body: JSON.stringify({ username: lu.value, password: lp.value, totp: lt.value, cap_token: cap, cf_turnstile_response: cf }) });
+        isLogin.value = true; nav('dashboard');
+        try { const v = await api(b('/api/version')); if (v && v.version) appVersion.value = v.version; } catch(e){}
+      } catch (e) { le.value = e.message; }
+      finally { loading.value = false; }
+    };
+    const doLogout = async () => {
+      try { await api(b('/api/logout'), { method: 'POST' }); } catch(e){}
+      isLogin.value = false; lu.value = ''; lp.value = ''; lt.value = '';
+    };
+
+    const ldDash = async () => {
+      try { const d = await api(b('/api/dashboard')); dash.tl = d.total_links; dash.tc = d.total_clicks; dash.pr = d.pending_reports||0; dash.ab = d.active_bans||0; } catch(e){}
+      try {
+        const d = await api(b('/api/status'));
+        st.db = d.database?.status||'?'; st.redis = d.redis?.status||'?';
+        st.uptime = d.server?.uptime||''; st.goroutines = d.server?.goroutines||0;
+        st.mem_alloc = d.server?.mem_alloc_mb||0; st.mem_heap = d.server?.mem_heap_mb||0; st.mem_sys = d.server?.mem_sys_mb||0; st.mem_stack = d.server?.mem_stack_mb||0;
+        st.num_gc = d.server?.num_gc||0; st.last_gc_seconds = d.server?.last_gc_seconds ?? -1; st.go_version = d.server?.go_version||''; st.cpu_count = d.server?.cpu_count||0;
+        st.version = d.server?.version||''; st.suffix = d.admin?.suffix||'';
+        st.container_mem = d.container?.memory_usage_mb||0; st.container_limit = d.container?.memory_limit_mb||0; st.container_pct = d.container?.memory_percent||0; st.container_limit_known = !!d.container?.limit_known;
+        st.host_total = d.host?.memory?.total_mb||0; st.host_used = d.host?.memory?.used_mb||0; st.host_avail = d.host?.memory?.available_mb||0; st.host_pct = d.host?.memory?.used_percent||0;
+        st.load1 = d.host?.load?.load1||'-'; st.load5 = d.host?.load?.load5||'-'; st.load15 = d.host?.load?.load15||'-';
+        st.disk_total = d.host?.disk?.total_mb||0; st.disk_used = d.host?.disk?.used_mb||0; st.disk_free = d.host?.disk?.free_mb||0; st.disk_pct = d.host?.disk?.used_percent||0;
+        if (st.version && !appVersion.value) appVersion.value = st.version;
+      } catch(e){}
+    };
+    const ldLinks = async () => { try { const d = await api(b('/api/links')); links.value = (d.list||[]).map(l=>({...l,created_at:l.created_at?new Date(l.created_at).toLocaleString():''})); } catch(e){} };
+    const delLink = async (code) => { try { await ElMessageBox.confirm('确认删除短链 '+code+' ?','删除确认',{type:'warning',confirmButtonText:'删除',cancelButtonText:'取消'}); await api(b('/api/links/'+code),{method:'DELETE'}); ElMessage.success('已删除'); ldLinks(); } catch(e){} };
+    const ldKeys = async () => { try { keys.value = await api(b('/api/apikeys')); } catch(e){} };
+    const createKey = async () => { try { const name=prompt('Key 名称','Key-'+Date.now()); if(!name)return; const purpose=prompt('用途说明','')||''; const permissions=(prompt('权限，逗号分隔','links:create,links:batch_create,stats:read_own')||'links:create').split(',').map(x=>x.trim()).filter(Boolean); const quota_per_day=+(prompt('每日额度，0=不限','0')||0); const d = await api(b('/api/apikeys'),{method:'POST',body:JSON.stringify({name,purpose,permissions,quota_per_day})}); ElMessage.success('API Key: '+d.api_key); ldKeys(); } catch(e){ElMessage.error(e.message)} };
+    const revokeKey = async (id) => { try { await api(b('/api/apikeys/'+id+'/revoke'),{method:'POST'}); ElMessage.success('已吊销'); ldKeys(); } catch(e){ElMessage.error(e.message)} }; const delKey = async (id) => { try { await ElMessageBox.confirm('确认删除此 API Key?','删除确认',{type:'warning'}); await api(b('/api/apikeys/'+id),{method:'DELETE'}); ldKeys(); } catch(e){} };
+    const ldBans = async () => { try { bans.value = await api(b('/api/bans')); } catch(e){} };
+    const doUnban = async (id) => { try { await api(b('/api/bans/'+id),{method:'DELETE'}); ElMessage.success('已解封'); ldBans(); ldDash(); } catch(e){} };
+    const ldReports = async () => { try { reports.value = await api(b('/api/reports?status=0')); } catch(e){} };
+    const doHandle = async (id, action) => { try { await api(b('/api/reports/'+id),{method:'POST',body:JSON.stringify({action})}); ElMessage.success('已处理'); ldReports(); ldDash(); } catch(e){ ElMessage.error(e.message); } };
+    const doAuto = async () => {
+      try {
+        const d = await api(b('/api/reports/auto-process'),{method:'POST'});
+        ElMessage.success(`Bot: ${d.approved||0} 通过, ${d.rejected||0} 驳回, ${d.pending||0} 待审`);
+        ldReports(); ldDash();
+      } catch(e) { ElMessage.error(e.message); }
+    };
+    const doReload = async () => { try { await api(b('/api/wordfilter/reload'),{method:'POST'}); ElMessage.success('敏感词库已重载'); } catch(e){} };
+    const ldAudit = async () => { try { const d=await api(b('/api/audit?page=1&size=50')); auditLogs.value=d.list||[]; } catch(e){} };
+    const ldDomains = async () => { try { domains.value=await api(b('/api/domains')); } catch(e){} };
+    const addDomain = async () => { try { const hostname=prompt('域名，例如 s.example.com',''); if(!hostname)return; const purpose=prompt('用途 public/admin/both','public')||'public'; await api(b('/api/domains'),{method:'POST',body:JSON.stringify({hostname,purpose,force_https:true,enabled:true})}); ldDomains(); } catch(e){ElMessage.error(e.message)} };
+    const delDomain = async (id) => { try { await api(b('/api/domains/'+id),{method:'DELETE'}); ldDomains(); } catch(e){ElMessage.error(e.message)} };
+
+    const ldSettings = async () => {
+      try {
+        const d = await api(b('/api/settings'));
+        s.suffix = d.suffix||''; s.shortlink_length = d.shortlink_length||6;
+        if (d.version) { s.version = d.version; appVersion.value = d.version; }
+        if (d.settings) { try { const parsed=JSON.parse(d.settings); Object.assign(s, parsed); if(s.cap_site_key){if(!s.cap_api_endpoint||/^https?:\/\/cap\.example\.com/i.test(s.cap_api_endpoint))s.cap_api_endpoint='/cap/'+s.cap_site_key+'/'; if(!s.cap_verify_url||s.cap_verify_url==='admin'||/^https?:\/\/cap\.example\.com/i.test(s.cap_verify_url))s.cap_verify_url='http://cap:3000/'+s.cap_site_key+'/siteverify'} if(Array.isArray(parsed.ttl_options))s.ttl_options_selected=parsed.ttl_options; if(s.ttl_default_seconds&&!TTL_PRESETS.some(x=>x.value===s.ttl_default_seconds))s.ttl_custom_default=s.ttl_default_seconds; if(s.ttl_max_seconds&&!TTL_PRESETS.some(x=>x.value===s.ttl_max_seconds))s.ttl_custom_max=s.ttl_max_seconds; if(s.favicon_url)setFavicon(s.favicon_url); } catch(e){} }
+      } catch(e){}
+      try { const d = await api(b('/api/totp')); totpUri.value = d.uri||''; totpVerified.value = !!d.verified; nextTick(()=>{ const el=document.getElementById('qr-totp'); if(el&&totpUri.value){el.innerHTML='';const dark=document.documentElement.dataset.theme==='dark';new QRCode(el,{text:totpUri.value,width:120,height:120,colorDark:dark?'#f8fafc':'#1e293b',colorLight:dark?'#0f172a':'#fff'});} }); } catch(e){}
+    };
+    const doVerifyTOTP = async () => {
+      if (!/^\d{6}$/.test(totpCode.value.trim())) { ElMessage.error(lang.value==='en'?'Enter a 6-digit code':'请输入 6 位验证码'); return; }
+      totpLoading.value = true;
+      try {
+        await api(b('/api/totp/verify'), { method:'POST', body: JSON.stringify({ code: totpCode.value.trim() }) });
+        totpVerified.value = true; totpCode.value = '';
+        ElMessage.success(lang.value==='en'?'TOTP enabled':'TOTP 已启用');
+      } catch(e) { ElMessage.error(e.message); }
+      finally { totpLoading.value = false; }
+    };
+
+    const ensureMessages = () => { if (!Array.isArray(s.public_messages)) s.public_messages = []; };
+    const addPublicMessage = () => { ensureMessages(); s.public_messages.push({ enabled:true, level:'info', title:'', content:'' }); };
+    const removePublicMessage = (idx) => { ensureMessages(); s.public_messages.splice(idx,1); };
+
+
+    const TTL_PRESETS = [{label:'永不过期',value:0},{label:'1 小时',value:3600},{label:'1 天',value:86400},{label:'7 天',value:604800},{label:'30 天',value:2592000},{label:'90 天',value:7776000},{label:'1 年',value:31536000}];
+    const ttlLabel = (v) => (TTL_PRESETS.find(x=>x.value===Number(v))||{label:(Number(v)||0)+' 秒'}).label;
+    const toggleTTLOption = (v) => { const n=Number(v); const arr=Array.isArray(s.ttl_options_selected)?s.ttl_options_selected:[]; if(arr.includes(n))s.ttl_options_selected=arr.filter(x=>x!==n);else s.ttl_options_selected=[...arr,n].sort((a,b)=>a-b); };
+    const ttlSummary = computed(() => `默认 ${ttlLabel(s.ttl_default_seconds)}，最长 ${ttlLabel(s.ttl_max_seconds)}，${s.ttl_allow_never?'允许':'禁止'}永不过期`);
+
+    const buildJSON = () => JSON.stringify({
+      cf_enabled: s.cf_enabled, cf_site_key: s.cf_site_key, cf_secret_key: s.cf_secret_key,
+      captcha_enabled: s.captcha_enabled, captcha_provider: s.captcha_provider, captcha_mode: s.captcha_mode, captcha_normal_provider: s.captcha_normal_provider, captcha_escalation_provider: s.captcha_escalation_provider, captcha_failure_threshold: s.captcha_failure_threshold, captcha_risk_window_seconds: s.captcha_risk_window_seconds, cap_site_key: s.cap_site_key, cap_api_endpoint: s.cap_api_endpoint, cap_secret_key: s.cap_secret_key, cap_verify_url: s.cap_verify_url, playcaptcha_enabled: s.playcaptcha_enabled, playcaptcha_site_key: s.playcaptcha_site_key, playcaptcha_secret_key: s.playcaptcha_secret_key, playcaptcha_endpoint: s.playcaptcha_endpoint,
+      feishu: s.feishu, feishu_webhook: s.feishu_webhook, feishu_secret: s.feishu_secret,
+      telegram: s.telegram, tg_token: s.tg_token, tg_chat: s.tg_chat,
+      dingtalk: s.dingtalk, ding_webhook: s.ding_webhook, ding_secret: s.ding_secret,
+      rate_create: s.rate_create, rate_redirect: s.rate_redirect,
+      bg_url: s.bg_url, bg_type: s.bg_type,
+      mod_enabled: s.mod_enabled, mod_openai_key: s.mod_openai_key, mod_auto_delete: s.mod_auto_delete,
+      bot_mode: s.bot_mode, bot_min_trust: s.bot_min_trust, bot_min_reports: s.bot_min_reports, bot_max_auto_daily: s.bot_max_auto_daily,
+      report_daily_limit: s.report_daily_limit, report_min_interval: s.report_min_interval,
+      version: s.version, favicon_url: s.favicon_url, public_messages: Array.isArray(s.public_messages) ? s.public_messages : [],
+      ttl_default_seconds: Number(s.ttl_default_seconds)||0, ttl_max_seconds: Number(s.ttl_max_seconds)||31536000, ttl_allow_never: !!s.ttl_allow_never, ttl_options: (Array.isArray(s.ttl_options_selected)?s.ttl_options_selected:[]).map(Number).filter(x=>x>=0),
+      domain_allowlist: s.domain_allowlist, domain_blocklist: s.domain_blocklist, risk_interstitial_enabled: s.risk_interstitial_enabled, risk_interstitial_threshold: s.risk_interstitial_threshold, risk_block_threshold: s.risk_block_threshold,
+      qr_show_direct: s.qr_show_direct, qr_allow_user_customize: s.qr_allow_user_customize, qr_default_template: s.qr_default_template, qr_default_text: s.qr_default_text, qr_logo_enabled: s.qr_logo_enabled, qr_logo_url: s.qr_logo_url,
+    });
+    const doSaveMessages = async () => {
+      try {
+        ensureMessages();
+        const messages = (Array.isArray(s.public_messages)?s.public_messages:[]).map(m=>({...m,title:(m.title||'').trim(),content:(m.content||'').trim()}));
+        if (messages.some(m=>m.enabled && !m.content)) { ElMessage.error(lang.value==='en'?'Enabled messages need content':'启用的用户消息必须填写内容'); return; }
+        s.public_messages = messages;
+        await api(b('/api/settings'),{method:'PUT',body:JSON.stringify({settings:JSON.stringify({public_messages:messages})})});
+        ElMessage.success(lang.value==='en'?'User messages saved':'用户消息已保存');
+      } catch(e){ ElMessage.error(e.message); }
+    };
+
+    const doSave = async () => {
+      try {
+        const d = await api(b('/api/settings'),{method:'PUT',body:JSON.stringify({shortlink_length:s.shortlink_length,settings:buildJSON()})});
+        if (d && d.version) appVersion.value = d.version;
+        if (d && d.suffix_changed && d.suffix) {
+          ElMessage.warning('短链长度与管理后缀长度冲突，已自动更新管理后缀：/'+d.suffix+'/，即将跳转');
+          setTimeout(()=>{ location.href='/' + d.suffix + '/'; }, 1800);
+          return;
+        }
+        ElMessage.success('设置已保存');
+      } catch(e){ ElMessage.error(e.message); }
+    };
+    const doRotate = async () => {
+      try { await ElMessageBox.confirm('更换后缀后当前页面将不可访问，需要使用新后缀重新打开。确认继续？','后缀轮换',{type:'warning',confirmButtonText:'确认更换',cancelButtonText:'取消'}); const d = await api(b('/api/settings/rotate-suffix'),{method:'POST'}); ElMessage.success('新后缀: /'+d.suffix+'/'); setTimeout(()=>{ location.href='/' + d.suffix + '/'; },2500); } catch(e){}
+    };
+
+    const nav = (p) => {
+      cp.value = p;
+      if (p==='dashboard') ldDash(); if (p==='links') ldLinks(); if (p==='apikeys') ldKeys();
+      if (p==='security') { ldBans(); ldDash(); ldSettings(); } if (p==='reports') ldReports();
+      if (p==='settings') ldSettings(); if (p==='status') ldDash(); if (p==='audit') ldAudit(); if (p==='domains') ldDomains();
+    };
+
+    const memPercent = computed(() => st.container_limit_known ? st.container_pct : (st.mem_sys > 0 ? Math.min(100, Math.round(st.mem_alloc / st.mem_sys * 100)) : 0));
+    const rateCreatePct = computed(() => Math.min(100, Math.round(s.rate_create / 60 * 100)));
+    const rateRedirectPct = computed(() => Math.min(100, Math.round(s.rate_redirect / 200 * 100)));
+
+    return { isLogin,cp,loading,lu,lp,lt,le,cfLoginEnabled,captchaLoginEnabled,dash,st,links,keys,bans,reports,totpUri,s,appVersion,
+      doLogin,doLogout,nav,ldLinks,delLink,ldKeys,createKey,revokeKey,delKey,ldBans,doUnban,ldReports,doHandle,doAuto,
+      ldSettings,doSave,doSaveMessages,doRotate,doReload,memPercent,rateCreatePct,rateRedirectPct,themeMode,lang,setThemeMode,setLang,tt,totpCode,totpVerified,totpLoading,doVerifyTOTP,addPublicMessage,removePublicMessage,auditLogs,domains,addDomain,delDomain,TTL_PRESETS,ttlLabel,toggleTTLOption,ttlSummary };
+  },
+  template: `
+  <!-- LOGIN -->
+  <div v-if="!isLogin" class="lw">
+    <div class="login-tools"><select class="tool-select" v-model="themeMode" @change="setThemeMode($event.target.value)"><option value="system">跟随系统 / System</option><option value="light">浅色 / Light</option><option value="dark">深色 / Dark</option></select><select class="tool-select" v-model="lang" @change="setLang($event.target.value)"><option value="zh">中文</option><option value="en">English</option></select></div>
+    <div class="lb">
+      <h2>Shortlink Admin</h2>
+      <div class="sub">{{tt('loginSub')}}</div>
+      <div class="fi"><label>{{tt('username')}}</label><input v-model="lu" type="text" placeholder="admin" autocomplete="username" @keyup.enter="doLogin"></div>
+      <div class="fi"><label>{{tt('password')}}</label><input v-model="lp" type="password" placeholder="••••••••" autocomplete="current-password" @keyup.enter="doLogin"></div>
+      <div class="fi"><label>{{tt('totp')}}</label><input v-model="lt" type="text" placeholder="可选 · 6位数字" maxlength="6" autocomplete="off" @keyup.enter="doLogin"></div>
+      <div v-if="captchaLoginEnabled" style="display:flex;justify-content:center;margin:8px 0"><cap-widget id="admin-cap-widget"></cap-widget></div><div v-if="cfLoginEnabled" style="display:flex;justify-content:center;margin:8px 0"><div id="admin-cf-widget"></div></div>
+      <div class="err">{{ le }}</div>
+      <button class="btn" @click="doLogin" :disabled="loading">{{ loading ? tt('verifying') : tt('login') }}</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div v-else class="lo">
+    <div class="sb">
+      <div class="sb-brand">
+        <div class="logo">S</div>
+        <span class="name">Shortlink</span>
+        <span class="ver" v-if="appVersion">{{appVersion}}</span>
+      </div>
+      <div class="sb-nav">
+        <div class="sb-section">{{tt('overview')}}</div>
+        <div class="sb-item" :class="{on:cp==='dashboard'}" @click="nav('dashboard')"><span class="icon">📊</span><span>{{tt('dashboard')}}</span></div>
+        <div class="sb-item" :class="{on:cp==='status'}" @click="nav('status')"><span class="icon">📡</span><span>{{tt('status')}}</span></div>
+        <div class="sb-section">{{tt('manage')}}</div>
+        <div class="sb-item" :class="{on:cp==='links'}" @click="nav('links')"><span class="icon">🔗</span><span>{{tt('links')}}</span></div>
+        <div class="sb-item" :class="{on:cp==='reports'}" @click="nav('reports')"><span class="icon">🚩</span><span>{{tt('reports')}}</span><span class="badge" v-if="dash.pr">{{dash.pr}}</span></div>
+        <div class="sb-item" :class="{on:cp==='apikeys'}" @click="nav('apikeys')"><span class="icon">🔑</span><span>API Keys</span></div>
+        <div class="sb-section">{{tt('security')}}</div>
+        <div class="sb-item" :class="{on:cp==='security'}" @click="nav('security')"><span class="icon">🛡️</span><span>{{tt('securityCenter')}}</span></div>
+        <div class="sb-section">{{tt('system')}}</div>
+        <div class="sb-item" :class="{on:cp==='settings'}" @click="nav('settings')"><span class="icon">⚙️</span><span>{{tt('settings')}}</span></div><div class="sb-item" :class="{on:cp==='audit'}" @click="nav('audit')"><span class="icon">🧾</span><span>审计日志</span></div><div class="sb-item" :class="{on:cp==='domains'}" @click="nav('domains')"><span class="icon">🌍</span><span>多域名</span></div>
+      </div>
+      <div class="sb-foot"><button @click="doLogout">{{tt('logout')}}</button></div>
+    </div>
+
+    <div class="mn">
+      <div class="top-tools"><select class="tool-select" v-model="themeMode" @change="setThemeMode($event.target.value)"><option value="system">跟随系统 / System</option><option value="light">浅色 / Light</option><option value="dark">深色 / Dark</option></select><select class="tool-select" v-model="lang" @change="setLang($event.target.value)"><option value="zh">中文</option><option value="en">English</option></select></div>
+      <!-- DASHBOARD -->
+      <div v-if="cp==='dashboard'">
+        <h2>{{tt('dashboard')}}</h2>
+        <p class="page-desc">{{tt('dashboardDesc')}}</p>
+        <div class="stats">
+          <div class="stat accent"><div class="icon-bg"></div><div class="val">{{dash.tl}}</div><div class="lbl">{{tt('totalLinks')}}</div></div>
+          <div class="stat success"><div class="icon-bg"></div><div class="val">{{dash.tc}}</div><div class="lbl">{{tt('totalClicks')}}</div></div>
+          <div class="stat" :class="dash.pr>0?'danger':''" ><div class="icon-bg"></div><div class="val">{{dash.pr}}</div><div class="lbl">{{tt('pendingReports')}}</div></div>
+          <div class="stat" :class="dash.ab>0?'warn':''"><div class="icon-bg"></div><div class="val">{{dash.ab}}</div><div class="lbl">{{tt('activeBans')}}</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title"><div class="dot" style="background:var(--success)"></div>{{tt('systemHealth')}}</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+            <div class="sec-metric"><span class="k">数据库</span><span class="v" :style="{color:st.db==='ok'?'var(--success)':'var(--danger)'}">{{st.db==='ok'?'正常':st.db}}</span></div>
+            <div class="sec-metric"><span class="k">Redis</span><span class="v" :style="{color:st.redis==='正常'?'var(--success)':'var(--danger)'}">{{st.redis}}</span></div>
+            <div class="sec-metric"><span class="k">运行时间</span><span class="v">{{st.uptime||'-'}}</span></div>
+            <div class="sec-metric"><span class="k">Goroutines</span><span class="v">{{st.goroutines}}</span></div>
+            <div class="sec-metric"><span class="k">内存使用</span><span class="v">{{st.mem_alloc}} MB</span></div>
+            <div class="sec-metric"><span class="k">GC 次数</span><span class="v">{{st.num_gc}}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATUS -->
+      <div v-if="cp==='status'">
+        <h2>{{tt('status')}}</h2>
+        <p class="page-desc">{{tt('statusDesc')}}</p>
+        <div class="stats">
+          <div class="stat" :class="st.db==='ok'?'success':'danger'"><div class="icon-bg"></div><div class="val">{{st.db==='ok'?'正常':'异常'}}</div><div class="lbl">MySQL 数据库</div></div>
+          <div class="stat" :class="st.redis==='正常'?'success':'danger'"><div class="icon-bg"></div><div class="val">{{st.redis}}</div><div class="lbl">Redis 缓存</div></div>
+          <div class="stat accent"><div class="icon-bg"></div><div class="val">{{st.container_mem}} MB</div><div class="lbl">容器当前内存</div></div>
+          <div class="stat warn"><div class="icon-bg"></div><div class="val">{{st.host_total}} MB</div><div class="lbl">宿主机可见总内存</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">内存与资源</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <div class="sec-metric"><span class="k">容器内存使用</span><span class="v">{{st.container_mem}} MB</span></div>
+            <div class="sec-metric"><span class="k">容器内存限制</span><span class="v">{{st.container_limit_known ? st.container_limit + ' MB' : '未限制 / 未识别'}}</span></div>
+            <div class="sec-metric"><span class="k">宿主机总内存</span><span class="v">{{st.host_total}} MB</span></div>
+            <div class="sec-metric"><span class="k">宿主机已用/可用</span><span class="v">{{st.host_used}} / {{st.host_avail}} MB</span></div>
+            <div class="sec-metric"><span class="k">Go Heap 当前</span><span class="v">{{st.mem_alloc}} MB</span></div>
+            <div class="sec-metric"><span class="k">Go Runtime 向系统申请</span><span class="v">{{st.mem_sys}} MB</span></div>
+            <div class="sec-metric"><span class="k">Stack 内存</span><span class="v">{{st.mem_stack}} MB</span></div>
+            <div class="sec-metric"><span class="k">磁盘使用</span><span class="v">{{st.disk_used}} / {{st.disk_total}} MB</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">容器内存使用率</div></div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <div class="sec-bar" style="flex:1"><div class="sec-bar-fill" :style="{width:Math.min(100,memPercent)+'%',background:memPercent>80?'var(--danger)':memPercent>50?'var(--warn)':'var(--success)'}"></div></div>
+            <span style="font-size:14px;font-weight:700;color:var(--text)">{{memPercent}}%</span>
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:var(--t3)">优先显示 cgroup/container 口径；无容器限制时退回 Go runtime 口径。</div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">运行时信息</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <div class="sec-metric"><span class="k">版本</span><span class="v">{{st.version}}</span></div>
+            <div class="sec-metric"><span class="k">Go 版本</span><span class="v">{{st.go_version}}</span></div>
+            <div class="sec-metric"><span class="k">CPU 核心</span><span class="v">{{st.cpu_count}}</span></div>
+            <div class="sec-metric"><span class="k">系统负载 1/5/15</span><span class="v">{{st.load1}} / {{st.load5}} / {{st.load15}}</span></div>
+            <div class="sec-metric"><span class="k">运行时间</span><span class="v">{{st.uptime}}</span></div>
+            <div class="sec-metric"><span class="k">Goroutines</span><span class="v">{{st.goroutines}}</span></div>
+            <div class="sec-metric"><span class="k">GC 次数</span><span class="v">{{st.num_gc}}</span></div>
+            <div class="sec-metric"><span class="k">上次 GC 距今</span><span class="v">{{st.last_gc_seconds>=0 ? st.last_gc_seconds + ' 秒' : '暂无'}}</span></div>
+            <div class="sec-metric"><span class="k">管理后缀</span><span class="v">/{{st.suffix}}/</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINKS -->
+      <div v-if="cp==='links'">
+        <h2>{{tt('links')}}</h2>
+        <p class="page-desc">查看和管理所有短链</p>
+        <div class="alert alert-info">🔒 为保护用户隐私，管理员仅可查看短码与点击数，无法查看原始链接。</div>
+        <table><tr><th>短码</th><th>点击量</th><th>{{tt('password')}}</th><th>创建时间</th><th>操作</th></tr>
+        <tr v-for="l in links" :key="l.short_code">
+          <td><span class="tag">{{l.short_code}}</span></td><td style="font-weight:600">{{l.click_count}}</td><td>{{l.has_password?'🔒 是':'—'}}</td><td style="color:var(--t2)">{{l.created_at}}</td>
+          <td><button class="btn2" @click="delLink(l.short_code)">删除</button></td>
+        </tr>
+        <tr v-if="links.length===0"><td colspan="5" style="text-align:center;padding:40px;color:var(--t3)">暂无短链数据</td></tr>
+        </table>
+      </div>
+
+      <!-- REPORTS -->
+      <div v-if="cp==='reports'">
+        <h2>{{tt('reports')}}</h2>
+        <p class="page-desc">处理用户提交的举报内容</p>
+        <div style="margin-bottom:16px"><button class="btn1" @click="doAuto">🤖 自动处理</button></div>
+        <div v-if="reports.length===0" class="empty"><div class="icon">✨</div><div class="text">暂无待处理举报，一切正常</div></div>
+        <div v-for="r in reports" :key="r.id" class="report-row">
+          <div class="ri">
+            <div class="code">{{r.short_code}}</div>
+            <div style="font-size:13px;color:var(--text)">{{r.reason==='mlm'?'传销/直销':r.reason==='porn'?'色情内容':r.reason==='fraud'?'欺诈/钓鱼':r.reason==='violence'?'暴力/恐怖':r.reason==='spam'?'垃圾广告':r.reason||'其他'}}</div>
+            <div v-if="r.custom_text" style="font-size:11px;color:var(--t3);margin-top:2px">{{r.custom_text}}</div>
+          </div>
+          <div class="ra">
+            <button class="btn1" @click="doHandle(r.id,'approve_delete')">✓ 确认删除</button>
+            <button class="btn4" @click="doHandle(r.id,'reject')">✗ 驳回</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- API KEYS -->
+      <div v-if="cp==='apikeys'">
+        <h2>API Keys</h2>
+        <p class="page-desc">管理外部接入密钥</p>
+        <div style="margin-bottom:16px"><button class="btn1" @click="createKey">+ 创建新 Key</button></div>
+        <table><tr><th>名称</th><th>用途</th><th>权限</th><th>每日额度</th><th>状态</th><th>操作</th></tr>
+        <tr v-for="k in keys" :key="k.id">
+          <td style="font-weight:500">{{k.name}}</td><td>{{k.purpose||'-'}}</td><td style="max-width:240px;word-break:break-all">{{k.permissions_json||'links:create'}}</td><td>{{k.quota_per_day||'不限'}}</td>
+          <td><span :style="{color:k.revoked?'var(--danger)':'var(--success)',fontWeight:600,fontSize:'12px'}">{{k.revoked?'已吊销':'正常'}}</span></td>
+          <td><button class="btn3" @click="revokeKey(k.id)">吊销</button> <button class="btn2" @click="delKey(k.id)">删除</button></td>
+        </tr>
+        <tr v-if="keys.length===0"><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">暂无 API Key</td></tr>
+        </table>
+      </div>
+
+      <!-- SECURITY CENTER -->
+      <div v-if="cp==='security'">
+        <h2>{{tt('securityCenter')}}</h2>
+        <p class="page-desc">网络安全模块总览与管理</p>
+
+        <div class="sec-grid">
+          <!-- Rate Limit Card -->
+          <div class="sec-card">
+            <div class="sec-card-header">
+              <div class="sec-card-title">🚦 速率限制</div>
+              <span class="sec-card-status ok">运行中</span>
+            </div>
+            <div class="sec-card-body">
+              <div class="sec-metric"><span class="k">创建限制</span><span class="v">{{s.rate_create}} 次/分</span></div>
+              <div class="sec-bar"><div class="sec-bar-fill" :style="{width:rateCreatePct+'%',background:'#6366f1'}"></div></div>
+              <div class="sec-metric"><span class="k">跳转限制</span><span class="v">{{s.rate_redirect}} 次/分</span></div>
+              <div class="sec-bar"><div class="sec-bar-fill" :style="{width:rateRedirectPct+'%',background:'#8b5cf6'}"></div></div>
+            </div>
+          </div>
+
+          <!-- Ban Status Card -->
+          <div class="sec-card">
+            <div class="sec-card-header">
+              <div class="sec-card-title">🚫 IP 封禁</div>
+              <span class="sec-card-status" :class="dash.ab>0?'warn':'ok'">{{dash.ab>0?dash.ab+' 个活跃':'无封禁'}}</span>
+            </div>
+            <div class="sec-card-body">
+              <div class="sec-metric"><span class="k">活跃封禁</span><span class="v" style="color:var(--danger)">{{dash.ab}}</span></div>
+              <div class="sec-metric"><span class="k">时区处理</span><span class="v" style="color:var(--success)">UTC 统一</span></div>
+              <div class="sec-metric"><span class="k">自动封禁</span><span class="v">规则驱动</span></div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn3" style="width:100%" @click="nav('security')">查看封禁列表 ↓</button>
+            </div>
+          </div>
+
+          <!-- Encryption Card -->
+          <div class="sec-card">
+            <div class="sec-card-header">
+              <div class="sec-card-title">🔐 数据加密</div>
+              <span class="sec-card-status ok">AES-256-GCM</span>
+            </div>
+            <div class="sec-card-body">
+              <div class="sec-metric"><span class="k">链接 URL</span><span class="v" style="color:var(--success)">✓ 加密</span></div>
+              <div class="sec-metric"><span class="k">TOTP 密钥</span><span class="v" style="color:var(--success)">✓ 加密</span></div>
+              <div class="sec-metric"><span class="k">设置存储</span><span class="v" style="color:var(--success)">✓ 加密</span></div>
+              <div class="sec-metric"><span class="k">IP 地址</span><span class="v" style="color:var(--success)">✓ HMAC 哈希</span></div>
+            </div>
+          </div>
+
+          <!-- Word Filter Card -->
+          <div class="sec-card">
+            <div class="sec-card-header">
+              <div class="sec-card-title">📝 敏感词过滤</div>
+              <span class="sec-card-status ok">DFA 引擎</span>
+            </div>
+            <div class="sec-card-body">
+              <div class="sec-metric"><span class="k">过滤引擎</span><span class="v">DFA 确定性有限自动机</span></div>
+              <div class="sec-metric"><span class="k">拦截方式</span><span class="v">实时阻断</span></div>
+              <div class="sec-metric"><span class="k">词库来源</span><span class="v">data/default-words.txt</span></div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn1" style="width:100%" @click="doReload">🔄 重载词库</button>
+            </div>
+          </div>
+
+          <!-- Admin Suffix Card -->
+          <div class="sec-card">
+            <div class="sec-card-header">
+              <div class="sec-card-title">🎯 后缀轮换</div>
+              <span class="sec-card-status ok">已启用</span>
+            </div>
+            <div class="sec-card-body">
+              <div class="sec-metric"><span class="k">当前后缀</span><span class="v">/{{s.suffix||st.suffix}}/</span></div>
+              <div class="sec-metric"><span class="k">路由模式</span><span class="v">原子热切换</span></div>
+              <div class="sec-metric"><span class="k">防护目的</span><span class="v">隐藏管理入口</span></div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn3" style="width:100%;color:var(--warn);border-color:rgba(245,158,11,.3)" @click="doRotate">⚡ 紧急轮换后缀</button>
+            </div>
+          </div>
+
+          <!-- CSP Card -->
+          <div class="sec-card">
+            <div class="sec-card-header">
+              <div class="sec-card-title">🌐 内容安全策略</div>
+              <span class="sec-card-status ok">CSP 激活</span>
+            </div>
+            <div class="sec-card-body">
+              <div class="sec-metric"><span class="k">script-src</span><span class="v">'self' + CDN</span></div>
+              <div class="sec-metric"><span class="k">img-src</span><span class="v">动态白名单</span></div>
+              <div class="sec-metric"><span class="k">XSS 防护</span><span class="v" style="color:var(--success)">✓ 启用</span></div>
+              <div class="sec-metric"><span class="k">点击劫持</span><span class="v" style="color:var(--success)">✓ X-Frame-Options</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ban List -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot" style="background:var(--danger)"></div>封禁列表</div>
+          </div>
+          <table v-if="bans.length>0"><tr><th>封禁原因</th><th>解封时间</th><th>操作</th></tr>
+          <tr v-for="b in bans" :key="b.id"><td>{{b.reason}}</td><td style="color:var(--t2)">{{b.ban_until}}</td><td><button class="btn1" style="padding:6px 14px;font-size:11px" @click="doUnban(b.id)">解封</button></td></tr></table>
+          <div v-else class="empty" style="padding:30px"><div class="text" style="color:var(--success)">✓ 当前无活跃封禁</div></div>
+        </div>
+      </div>
+
+
+
+      <div v-if="cp==='audit'">
+        <h2>审计日志</h2><p class="page-desc">查看管理员、API Key 和系统关键操作记录</p>
+        <table><tr><th>时间</th><th>操作者</th><th>动作</th><th>资源</th><th>元数据</th></tr><tr v-for="a in auditLogs" :key="a.id"><td>{{a.created_at}}</td><td>{{a.actor_type}}/{{a.actor_id}}</td><td>{{a.action}}</td><td>{{a.resource}} {{a.resource_id}}</td><td style="max-width:320px;word-break:break-all">{{a.metadata}}</td></tr><tr v-if="auditLogs.length===0"><td colspan="5" style="text-align:center;padding:40px;color:var(--t3)">暂无审计日志</td></tr></table>
+      </div>
+
+      <div v-if="cp==='domains'">
+        <h2>多域名</h2><p class="page-desc">管理短链域名；第一版短码仍全局唯一</p><div style="margin-bottom:16px"><button class="btn1" @click="addDomain">+ 添加域名</button></div>
+        <table><tr><th>域名</th><th>用途</th><th>默认</th><th>HTTPS</th><th>状态</th><th>操作</th></tr><tr v-for="d in domains" :key="d.id"><td>{{d.hostname}}</td><td>{{d.purpose}}</td><td>{{d.is_default?'是':'否'}}</td><td>{{d.force_https?'是':'否'}}</td><td>{{d.enabled?'启用':'关闭'}}</td><td><button class="btn2" @click="delDomain(d.id)">删除</button></td></tr><tr v-if="domains.length===0"><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">暂无域名</td></tr></table>
+      </div>
+
+      <!-- SETTINGS -->
+      <div v-if="cp==='settings'">
+        <h2>{{tt('settings')}}</h2>
+        <p class="page-desc">配置系统参数与集成</p>
+
+        <div class="totp-setup">
+          <div id="qr-totp" class="totp-box"></div>
+          <div class="totp-actions">
+            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">{{tt('totpTitle')}}</div>
+            <div style="color:var(--t2);font-size:13px;line-height:1.6;margin-bottom:12px">{{tt('totpDesc')}}</div>
+            <span class="totp-status" :class="totpVerified?'on':'off'">{{totpVerified?tt('totpEnabled'):tt('totpPending')}}</span>
+            <div v-if="!totpVerified" style="display:flex;gap:10px;margin-top:14px;max-width:360px">
+              <input class="tool-input" style="flex:1;border-radius:10px" v-model="totpCode" maxlength="6" inputmode="numeric" :placeholder="tt('totpInput')">
+              <button class="btn1" @click="doVerifyTOTP" :disabled="totpLoading">{{totpLoading?tt('totpVerifying'):tt('totpVerify')}}</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">📌 版本信息</div>
+        <div class="frow">
+          <div class="fi" style="flex:2"><label>当前运行版本</label><input v-model="s.version" placeholder="BETA2.0-ALPHA"></div>
+          <div class="fi"><label>说明</label><div style="padding-top:8px;color:var(--t3);font-size:12px">保存后即时生效，用户页将同步显示</div></div>
+        </div>
+        <div class="section">🌐 网页图标</div>
+        <div class="frow"><div class="fi" style="flex:2"><label>网页图标 URL</label><input v-model="s.favicon_url" placeholder="https://example.com/favicon.png"></div><div class="fi"><label>预览</label><div style="padding-top:8px;color:var(--t3);font-size:12px">支持 PNG/SVG/ICO，保存后用户页和后台都会生效</div></div></div>
+
+        <div class="section">📣 用户消息</div>
+        <div class="panel" style="padding:18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="color:var(--t2);font-size:13px">在这里维护多条用户页公告；启用后会显示在用户页独立公告区域，不会混入创建表单。</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+              <button class="btn3" style="padding:8px 14px" @click="doSaveMessages">💾 保存用户消息</button>
+              <button class="btn1" style="padding:8px 14px" @click="addPublicMessage">+ 添加消息</button>
+            </div>
+          </div>
+          <div v-if="!s.public_messages || s.public_messages.length===0" style="padding:20px;text-align:center;color:var(--t3);border:1px dashed var(--border);border-radius:12px">暂无消息</div>
+          <div v-for="(m,i) in s.public_messages" :key="i" style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--bg)">
+            <div class="frow" style="align-items:flex-end">
+              <div class="fi" style="min-width:120px;flex:.4"><label>启用</label><select v-model="m.enabled"><option :value="true">启用</option><option :value="false">关闭</option></select></div>
+              <div class="fi" style="min-width:140px;flex:.5"><label>类型</label><select v-model="m.level"><option value="info">信息</option><option value="success">成功</option><option value="warn">警告</option><option value="danger">重要</option></select></div>
+              <div class="fi" style="flex:1"><label>标题</label><input v-model="m.title" placeholder="例如：系统公告"></div>
+              <div class="fi" style="flex:.2"><label>操作</label><button class="btn2" style="width:100%" @click="removePublicMessage(i)">删除</button></div>
+            </div>
+            <div class="fi"><label>消息内容</label><input v-model="m.content" maxlength="300" placeholder="输入要展示给用户的消息，最多 300 字"></div>
+          </div>
+        </div>
+
+        <div class="section">🎯 管理入口</div>
+        <div class="frow">
+          <div class="fi" style="flex:2"><label>当前管理后缀</label><div style="display:flex;align-items:center;gap:12px;padding-top:4px"><span class="tag" style="font-size:14px">/{{s.suffix}}/</span><button class="btn3" @click="doRotate">🔄 更换后缀</button></div></div>
+          <div class="fi"><label>短链默认长度</label><input type="number" v-model.number="s.shortlink_length" min="4" max="12"></div>
+        </div>
+
+
+        <div class="section">⏰ 链接有效期策略</div>
+        <div class="frow"><div class="fi"><label>允许永不过期</label><select v-model="s.ttl_allow_never"><option :value="true">允许</option><option :value="false">禁止</option></select><div class="hint">关闭后，系统会自动使用默认有效期，前台也不会显示“永不过期”。</div></div><div class="fi"><label>默认有效期</label><select v-model.number="s.ttl_default_seconds"><option v-if="s.ttl_allow_never" :value="0">永不过期</option><option v-for="p in TTL_PRESETS.filter(x=>x.value>0)" :key="'d'+p.value" :value="p.value">{{p.label}}</option><option :value="s.ttl_custom_default">自定义：{{ttlLabel(s.ttl_custom_default)}}</option></select><input v-model.number="s.ttl_custom_default" type="number" min="60" placeholder="自定义默认秒数"></div><div class="fi"><label>最大有效期</label><select v-model.number="s.ttl_max_seconds"><option v-for="p in TTL_PRESETS.filter(x=>x.value>0)" :key="'m'+p.value" :value="p.value">{{p.label}}</option><option :value="s.ttl_custom_max">自定义：{{ttlLabel(s.ttl_custom_max)}}</option></select><input v-model.number="s.ttl_custom_max" type="number" min="60" placeholder="自定义最大秒数"></div></div>
+        <div class="fi"><label>前台可选有效期</label><div class="ttl-pills"><button type="button" v-for="p in TTL_PRESETS" :key="p.value" class="ttl-pill" :class="{on:(s.ttl_options_selected||[]).includes(p.value)}" v-show="p.value>0 || s.ttl_allow_never" @click="toggleTTLOption(p.value)">{{p.label}}</button></div><div class="hint">{{ttlSummary}}</div></div>
+
+        <div class="section">🛡️ 风险域名策略</div>
+        <div class="frow"><div class="fi"><label>启用跳转确认页</label><select v-model="s.risk_interstitial_enabled"><option :value="true">启用</option><option :value="false">关闭</option></select></div><div class="fi"><label>确认阈值</label><input type="number" v-model.number="s.risk_interstitial_threshold" min="0" max="100"></div><div class="fi"><label>阻断阈值</label><input type="number" v-model.number="s.risk_block_threshold" min="0" max="100"></div></div>
+        <div class="frow"><div class="fi"><label>域名白名单（一行一个）</label><input v-model="s.domain_allowlist" placeholder="example.com,*.trusted.com"></div><div class="fi"><label>域名黑名单（一行一个）</label><input v-model="s.domain_blocklist" placeholder="bad.com,*.bad.com"></div></div>
+
+        <div class="section">▣ 二维码策略</div>
+        <div class="frow"><div class="fi"><label>创建后直接显示二维码</label><select v-model="s.qr_show_direct"><option :value="true">显示</option><option :value="false">隐藏</option></select><div class="hint">控制用户页创建成功后是否立即展示二维码。</div></div><div class="fi"><label>允许用户自定义文字</label><select v-model="s.qr_allow_user_customize"><option :value="true">允许</option><option :value="false">禁止</option></select><div class="hint">关闭后，用户/API 不能提交二维码文字。</div></div><div class="fi"><label>默认模板</label><select v-model="s.qr_default_template"><option value="classic">Classic</option><option value="card">Card</option><option value="compact">Compact</option></select><div class="hint">影响用户页二维码卡片样式。</div></div></div>
+        <div class="frow"><div class="fi"><label>默认二维码文字</label><input v-model="s.qr_default_text"></div><div class="fi"><label>Logo URL（仅管理员）</label><input v-model="s.qr_logo_url"></div><div class="fi"><label>启用 Logo</label><select v-model="s.qr_logo_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+
+        <div class="section">🚦 速率限制</div>
+        <div class="frow"><div class="fi"><label>创建/分钟</label><input type="number" v-model.number="s.rate_create" min="1"></div><div class="fi"><label>跳转/分钟</label><input type="number" v-model.number="s.rate_redirect" min="1"></div></div><div class="frow"><div class="fi"><label>白名单 IP/CIDR</label><input v-model="s.rate_whitelist" placeholder="127.0.0.1,10.0.0.0/8"></div><div class="fi"><label>说明</label><div style="padding-top:8px;color:var(--t3);font-size:12px">逗号分隔；匹配的 IP 不受速率限制影响</div></div></div>
+
+        <div class="section">🧩 验证码与风控</div>
+        <div class="captcha-lab"><div class="lab-title">双层验证策略</div><div class="lab-copy">Cap 负责日常低摩擦验证；连续失败或异常访问会自动升级到 Cloudflare Turnstile。PlayCaptcha 只保留为视觉实验，不参与后端安全判断。</div><span class="lab-pill">Cap 主力 · Turnstile 升级</span></div>
+        <div class="frow"><div class="fi"><label>启用验证码</label><select v-model="s.captcha_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select></div><div class="fi"><label>主力 Provider</label><select v-model="s.captcha_provider"><option value="cap">Cap Proof-of-Work</option></select></div><div class="fi"><label>模式</label><select v-model="s.captcha_mode"><option value="adaptive">自适应</option></select></div></div>
+        <div v-if="s.captcha_enabled" class="frow"><div class="fi"><label>Cap Site Key</label><input v-model="s.cap_site_key" placeholder="Cap site key"></div><div class="fi"><label>Cap API Endpoint</label><input v-model="s.cap_api_endpoint" placeholder="https://cap.example.com/site-key/"></div><div class="fi"><label>Cap Verify URL</label><input v-model="s.cap_verify_url" placeholder="https://cap.example.com/site-key/siteverify"></div><div class="fi"><label>Cap Secret Key</label><input type="password" v-model="s.cap_secret_key"></div></div>
+        <div v-if="s.captcha_enabled" class="frow"><div class="fi"><label>失败几次后升级</label><input type="number" v-model.number="s.captcha_failure_threshold" min="1" max="20"></div><div class="fi"><label>风险窗口（秒）</label><input type="number" v-model.number="s.captcha_risk_window_seconds" min="60" max="86400"></div><div class="fi"><label>升级 Provider</label><select v-model="s.captcha_escalation_provider"><option value="turnstile">Cloudflare Turnstile</option></select></div></div>
+
+        <div class="section">☁️ Cloudflare Turnstile（异常升级）</div>
+        <div class="frow"><div class="fi"><label>启用</label><select v-model="s.cf_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select><div class="hint">作为异常访问、Cap 多次失败后的严格验证。</div></div></div>
+        <div v-if="s.cf_enabled" class="frow"><div class="fi"><label>Site Key</label><input v-model="s.cf_site_key" placeholder="0x..."></div><div class="fi"><label>Secret Key</label><input type="password" v-model="s.cf_secret_key"></div></div>
+        <div class="section">🎮 PlayCaptcha（实验性 UI）</div>
+        <div class="frow"><div class="fi"><label>启用实验字段</label><select v-model="s.playcaptcha_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select><div class="hint">不作为后端安全判断，只预留未来趣味交互。</div></div><div class="fi"><label>Endpoint</label><input v-model="s.playcaptcha_endpoint" placeholder="实验性"></div></div>
+
+        <div class="section">🔔 通知渠道</div>
+        <div class="frow"><div class="fi"><label>飞书</label><select v-model="s.feishu"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.feishu" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.feishu_webhook"></div><div class="fi"><label>签名 Secret</label><input v-model="s.feishu_secret"></div></div>
+        <div class="frow"><div class="fi"><label>Telegram</label><select v-model="s.telegram"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.telegram" class="frow"><div class="fi"><label>Bot Token</label><input v-model="s.tg_token"></div><div class="fi"><label>Chat ID</label><input v-model="s.tg_chat"></div></div>
+        <div class="frow"><div class="fi"><label>钉钉</label><select v-model="s.dingtalk"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.dingtalk" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.ding_webhook"></div><div class="fi"><label>签名 Secret</label><input v-model="s.ding_secret"></div></div>
+        <div class="frow"><div class="fi"><label>企业微信</label><select v-model="s.wecom"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.wecom" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.wecom_webhook"></div></div>
+        <div class="frow"><div class="fi"><label>Bark</label><select v-model="s.bark"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.bark" class="frow"><div class="fi"><label>Bark Key</label><input v-model="s.bark_key"></div><div class="fi"><label>Endpoint</label><input v-model="s.bark_endpoint" placeholder="https://api.day.app"></div></div>
+        <div class="frow"><div class="fi"><label>Discord</label><select v-model="s.discord"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.discord" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.discord_webhook"></div></div>
+        <div class="frow"><div class="fi"><label>Email SMTP</label><select v-model="s.email"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.email" class="frow"><div class="fi"><label>SMTP Host</label><input v-model="s.email_host"></div><div class="fi"><label>Port</label><input v-model="s.email_port"></div><div class="fi"><label>User</label><input v-model="s.email_user"></div><div class="fi"><label>Password</label><input type="password" v-model="s.email_pass"></div><div class="fi"><label>From</label><input v-model="s.email_from"></div><div class="fi"><label>To</label><input v-model="s.email_to" placeholder="a@example.com,b@example.com"></div></div>
+        <div class="frow"><div class="fi"><label>通用 Webhook</label><select v-model="s.webhook"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.webhook" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.webhook_url"></div><div class="fi"><label>Secret Header</label><input v-model="s.webhook_secret"></div></div>
+
+        <div class="section">🤖 AI 审核（OpenAI Moderation）</div>
+        <div class="frow"><div class="fi"><label>启用</label><select v-model="s.mod_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div v-if="s.mod_enabled" class="frow"><div class="fi"><label>OpenAI API Key</label><input type="password" v-model="s.mod_openai_key" placeholder="sk-..."></div><div class="fi"><label>高置信自动删除</label><select v-model="s.mod_auto_delete"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+
+        <div class="section">🤖 举报自动化 Bot</div>
+        <div class="frow">
+          <div class="fi"><label>Bot 模式</label><select v-model="s.bot_mode"><option value="off">关闭（手动审核）</option><option value="approve_all">全部自动通过</option><option value="reject_all">全部自动驳回</option><option value="smart">智能判断（推荐）</option></select></div>
+        </div>
+        <div v-if="s.bot_mode==='smart'" class="frow">
+          <div class="fi"><label>最低信任度</label><input type="number" v-model.number="s.bot_min_trust" min="0" max="1" step="0.1"></div>
+          <div class="fi"><label>最少举报数</label><input type="number" v-model.number="s.bot_min_reports" min="1" max="100"></div>
+          <div class="fi"><label>每日自动上限</label><input type="number" v-model.number="s.bot_max_auto_daily" min="1"></div>
+        </div>
+        <div class="frow">
+          <div class="fi"><label>举报间隔（秒）</label><input type="number" v-model.number="s.report_min_interval" min="3" max="60"></div>
+          <div class="fi"><label>每日举报上限/IP</label><input type="number" v-model.number="s.report_daily_limit" min="1" max="200"></div>
+        </div>
+
+        <div class="section">🖼️ 用户页背景</div>
+        <div class="frow"><div class="fi"><label>背景图片/视频 URL</label><input v-model="s.bg_url" placeholder="留空使用默认渐变背景"></div><div class="fi"><label>类型</label><select v-model="s.bg_type"><option value="image">图片</option><option value="video">视频</option></select></div></div>
+
+        <div style="margin-top:36px;padding-top:24px;border-top:1px solid var(--border)"><button class="btn1" style="padding:14px 48px;font-size:15px" @click="doSave">💾 保存全部设置</button></div>
+      </div>
+    </div>
+  </div>`
+}).use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>

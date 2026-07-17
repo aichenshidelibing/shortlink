@@ -1,0 +1,29 @@
+server: {port: 8080, mode: release, trusted_proxy: true}
+database: {driver: mysql, host: mysql, port: 3306, user: shortlink, password: shortlink_pass, dbname: shortlink, charset: utf8mb4, max_open: 50, max_idle: 10}
+redis: {addr: redis:6379, password: "", db: 0}
+admin: {username: admin, password: "", session_secret: ""}
+encryption: {key: ""}
+shortlink: {default_length: 6, max_custom_length: 32, min_custom_length: 4, hashids_salt: "", snowflake_worker: 1, snowflake_datacenter: 1}
+rate_limit: {create_per_minute: 10, redirect_per_minute: 60}
+cloudflare: {enabled: false, site_key: "", secret_key: ""}
+captcha:
+  enabled: false
+  provider: cap
+  mode: adaptive
+  normal_provider: cap
+  escalation_provider: turnstile
+  failure_threshold: 3
+  risk_window_seconds: 600
+  cap: {site_key: "", secret_key: "", verify_url: "http://cap:3000//siteverify", api_endpoint: "/cap//"}
+  playcaptcha: {enabled: false, site_key: "", secret_key: "", endpoint: ""}
+notification:
+  feishu: {enabled: false, webhook: "", secret: ""}
+  telegram: {enabled: false, bot_token: "", chat_id: ""}
+  dingtalk: {enabled: false, webhook: "", secret: ""}
+  wecom: {enabled: false, webhook: ""}
+  bark: {enabled: false, key: "", endpoint: ""}
+  discord: {enabled: false, webhook: ""}
+  email: {enabled: false, host: "", port: "587", user: "", pass: "", from: "", to: ""}
+  webhook: {enabled: false, url: "", secret: ""}
+features: {allow_custom_code: true, require_privacy_agree: true}
+background: {enabled: false, url: "", type: image}
