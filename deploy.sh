@@ -340,6 +340,20 @@ cap_key_ready() {
     curl -fsS "${base}/${CAP_SITE_KEY}/challenge" >/dev/null 2>&1
 }
 
+get_current_admin_suffix() {
+    local line
+    line=$( ($COMPOSE_CMD logs --no-color app 2>/dev/null || true) | grep '"msg":"Admin suffix"' | tail -n1 || true )
+    [ -n "$line" ] || return 1
+    printf '%s' "$line" | python3 -c 'import json,sys
+line=sys.stdin.read().strip()
+if not line:
+    raise SystemExit(1)
+try:
+    print(json.loads(line).get("suffix",""))
+except Exception:
+    raise SystemExit(1)'
+}
+
 auto_configure_cap() {
     local base="http://127.0.0.1:${CAP_HTTP_PORT}" origin="$1" login token hash created site secret
     echo -e "${YELLOW}>>> 自动初始化 Cap Site Key...${NC}"
@@ -664,13 +678,21 @@ PY
         $COMPOSE_CMD up -d app
     fi
 
+    ADMIN_SUFFIX="$(get_current_admin_suffix || true)"
     echo ""
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}   部署成功！${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo ""
     echo -e "📌 访问地址: ${BLUE}http://127.0.0.1:${PORT}${NC}"
-    echo -e "📌 管理后台: ${BLUE}后台入口已随机生成，请查看应用日志或通知渠道获取${NC}"
+    echo -e "📌 管理员账号: ${BLUE}admin${NC}"
+    echo -e "📌 管理员密码: ${BLUE}${ADMIN_PASSWORD}${NC}"
+    if [ -n "${ADMIN_SUFFIX:-}" ]; then
+        echo -e "📌 当前后缀: ${BLUE}${ADMIN_SUFFIX}${NC}"
+        echo -e "📌 管理后台: ${BLUE}http://127.0.0.1:${PORT}/${ADMIN_SUFFIX}/${NC}"
+    else
+        echo -e "📌 管理后台: ${BLUE}请查看应用日志中的 Admin suffix${NC}"
+    fi
     echo -e "📌 已绑定回环 (127.0.0.1) — 外网访问请自行配置 Nginx 反代到 ${BLUE}127.0.0.1:${PORT}${NC}"
     echo -e "📌 Cap 控制台: ${BLUE}http://127.0.0.1:${CAP_HTTP_PORT}${NC}（本机随机端口，不暴露公网）"
     echo -e "📌 Cap 公网页面/组件统一走 Shortlink 同域反代: ${BLUE}/cap/${NC}；反代公网时只需要把域名指向 Shortlink 主服务。"
