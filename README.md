@@ -569,7 +569,7 @@ docker compose logs app | grep "Admin suffix"
 本项目的人机验证能力使用并集成了以下优秀开源项目：
 
 - [tiagozip/cap](https://github.com/tiagozip/cap)：自托管、轻量的 Proof-of-Work CAPTCHA。Shortlink 使用 Cap 作为默认日常验证码，并通过同源 `/cap/` 路径集成其 widget、WASM 和验证 API。
-- [mortspace/playcaptcha](https://github.com/mortspace/playcaptcha)：一个有趣的交互式验证码项目。本项目调研后认为它更适合作为趣味 UI 灵感，不作为后端可信安全验证主力。
+- [mortspace/playcaptcha](https://github.com/mortspace/playcaptcha)：一个有趣的交互式验证码项目。感谢
 
 同时感谢 Go、Gin、GORM、Redis、MySQL、Docker 等开源生态。
 
