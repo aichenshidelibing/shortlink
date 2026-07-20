@@ -8,6 +8,7 @@ import (
 	"shortlink/internal/model"
 	"shortlink/internal/repository"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -22,10 +23,11 @@ type ReportService struct {
 
 	mu         sync.Mutex
 	lastReport map[string]time.Time
+	cfg        atomic.Value // ReportConfig
 }
 
 func NewReportService(repo *repository.LinkRepository, scanner *SafeScanner, modSvc *ModerationService, bot *ReportBot, log *zap.Logger) *ReportService {
-	return &ReportService{
+	svc := &ReportService{
 		repo:       repo,
 		scanner:    scanner,
 		modSvc:     modSvc,
@@ -33,6 +35,8 @@ func NewReportService(repo *repository.LinkRepository, scanner *SafeScanner, mod
 		log:        log,
 		lastReport: make(map[string]time.Time),
 	}
+	svc.ReloadConfig(DefaultReportConfig)
+	return svc
 }
 
 func hashReporterIP(ip string) string {
@@ -53,6 +57,32 @@ var DefaultReportConfig = ReportConfig{
 	AutoBanAfter: 10,
 }
 
+func normalizeReportConfig(cfg ReportConfig) ReportConfig {
+	if cfg.DailyLimit <= 0 {
+		cfg.DailyLimit = DefaultReportConfig.DailyLimit
+	}
+	if cfg.MinInterval <= 0 {
+		cfg.MinInterval = DefaultReportConfig.MinInterval
+	}
+	if cfg.AutoBanAfter <= 0 {
+		cfg.AutoBanAfter = DefaultReportConfig.AutoBanAfter
+	}
+	return cfg
+}
+
+func (s *ReportService) ReloadConfig(cfg ReportConfig) {
+	s.cfg.Store(normalizeReportConfig(cfg))
+}
+
+func (s *ReportService) currentConfig() ReportConfig {
+	if v := s.cfg.Load(); v != nil {
+		if cfg, ok := v.(ReportConfig); ok {
+			return cfg
+		}
+	}
+	return DefaultReportConfig
+}
+
 func (s *ReportService) Submit(ctx context.Context, shortCode, reason, customText, ip string) error {
 	ipHash := hashReporterIP(ip)
 
@@ -68,13 +98,14 @@ func (s *ReportService) Submit(ctx context.Context, shortCode, reason, customTex
 	if err != nil {
 		return err
 	}
-	if count >= int64(DefaultReportConfig.DailyLimit) {
+	cfg := s.currentConfig()
+	if count >= int64(cfg.DailyLimit) {
 		return fmt.Errorf("daily report limit reached")
 	}
 
 	s.mu.Lock()
 	last, exists := s.lastReport[ip]
-	if exists && time.Since(last) < time.Duration(DefaultReportConfig.MinInterval)*time.Second {
+	if exists && time.Since(last) < time.Duration(cfg.MinInterval)*time.Second {
 		s.mu.Unlock()
 		return fmt.Errorf("please wait before submitting another report")
 	}

@@ -58,7 +58,9 @@ function onAdminTurnstileReady(){renderAdminTurnstile()}
 function ensureAdminTurnstileScript(){if(!adminCFKey||document.getElementById('admin-turnstile-script')||adminTurnstileLoading)return;adminTurnstileLoading=true;const s=document.createElement('script');s.id='admin-turnstile-script';s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onAdminTurnstileReady';s.async=true;s.defer=true;s.onload=()=>{adminTurnstileLoading=false;renderAdminTurnstile()};s.onerror=()=>{adminTurnstileLoading=false};document.head.appendChild(s)}
 function renderAdminTurnstile(){if(!adminCFKey||!window.turnstile||adminCFRendered)return;try{turnstile.render('#admin-cf-widget',{sitekey:adminCFKey});adminCFRendered=true}catch(e){}}
 function ensureAdminCapScript(){if(document.getElementById('admin-cap-widget-script'))return;const s=document.createElement('script');s.id='admin-cap-widget-script';s.type='module';s.src='/cap/assets/widget.js';s.onerror=()=>{s.src='https://cdn.jsdelivr.net/npm/@cap.js/widget'};document.head.appendChild(s)}
-function renderAdminCap(){if(!adminCaptchaCfg.enabled||!adminCaptchaCfg.capEndpoint)return;ensureAdminCapScript();const w=document.getElementById('admin-cap-widget');if(!w)return;w.setAttribute('data-cap-api-endpoint',adminCaptchaCfg.capEndpoint);w.setAttribute('data-cap-worker-count','1');w.setAttribute('data-cap-i18n-initial-state','确认你是真人');w.setAttribute('data-cap-i18n-verifying-label','正在验证...');w.setAttribute('data-cap-i18n-solved-label','已验证');w.addEventListener('solve',e=>{adminCapToken=e.detail?.token||e.detail||getAdminCapToken()})}
+function adminCapI18n(){const en=(localStorage.getItem('sl_admin_lang')||'zh')==='en';return{initial:en?'Verify you are human':'确认你是真人',verifying:en?'Verifying...':'正在验证...',solved:en?'Verified':'已验证',error:en?'Verification failed':'验证失败',troubleshooting:en?'Having trouble?':'遇到问题？',wasm:en?'Verification unavailable':'验证暂不可用',verifyAria:en?'Verify you are human':'确认你是真人',verifyingAria:en?'Verification in progress':'正在验证',verifiedAria:en?'Verified':'已验证',required:en?'Required':'必填',errorAria:en?'Verification error':'验证错误'}}
+function applyAdminCapI18n(w){if(!w)return;const i=adminCapI18n();w.setAttribute('data-cap-i18n-initial-state',i.initial);w.setAttribute('data-cap-i18n-verifying-label',i.verifying);w.setAttribute('data-cap-i18n-solved-label',i.solved);w.setAttribute('data-cap-i18n-error-label',i.error);w.setAttribute('data-cap-i18n-troubleshooting-label',i.troubleshooting);w.setAttribute('data-cap-i18n-wasm-disabled',i.wasm);w.setAttribute('data-cap-i18n-verify-aria-label',i.verifyAria);w.setAttribute('data-cap-i18n-verifying-aria-label',i.verifyingAria);w.setAttribute('data-cap-i18n-verified-aria-label',i.verifiedAria);w.setAttribute('data-cap-i18n-required-label',i.required);w.setAttribute('data-cap-i18n-error-aria-label',i.errorAria)}
+function renderAdminCap(){if(!adminCaptchaCfg.enabled||!adminCaptchaCfg.capEndpoint)return;ensureAdminCapScript();const w=document.getElementById('admin-cap-widget');if(!w)return;applyAdminCapI18n(w);w.setAttribute('data-cap-api-endpoint',adminCaptchaCfg.capEndpoint);w.setAttribute('data-cap-worker-count','1');if(w.dataset.capBound==='1')return;w.dataset.capBound='1';w.addEventListener('solve',e=>{adminCapToken=e.detail?.token||e.detail||getAdminCapToken()})}
 function getAdminCapToken(){return adminCapToken||document.querySelector('#admin-cap-widget input[name="cap-token"]')?.value||document.querySelector('[name="cap-token"]')?.value||''}
 
 
@@ -77,7 +79,12 @@ createApp({
       feishu: false, feishu_webhook: '', feishu_secret: '',
       telegram: false, tg_token: '', tg_chat: '',
       dingtalk: false, ding_webhook: '', ding_secret: '',
-      rate_create: 10, rate_redirect: 60,
+      wecom: false, wecom_webhook: '',
+      bark: false, bark_key: '', bark_endpoint: '',
+      discord: false, discord_webhook: '',
+      email: false, email_host: '', email_port: '587', email_user: '', email_pass: '', email_from: '', email_to: '',
+      webhook: false, webhook_url: '', webhook_secret: '',
+      rate_create: 10, rate_redirect: 60, rate_whitelist: '',
       bg_url: '', bg_type: 'image',
       mod_enabled: false, mod_openai_key: '', mod_auto_delete: false,
       bot_mode: 'off', bot_min_trust: 0.7, bot_min_reports: 5, bot_max_auto_daily: 100,
@@ -93,7 +100,8 @@ createApp({
 	    applyTheme(themeMode.value); applyLang(lang.value);
 	    const setThemeMode = (m) => { themeMode.value=m; applyTheme(m); };
 	    const tt = (k) => (LABELS[lang.value] && LABELS[lang.value][k]) || LABELS.zh[k] || k;
-	    const setLang = (l) => { lang.value=l; applyLang(l); };
+    const L = (zh, en) => (lang.value === 'en' ? en : zh);
+	    const setLang = (l) => { lang.value=l; applyLang(l); nextTick(renderAdminCap); };
 	    if (window.matchMedia) matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{if(themeMode.value==='system')applyTheme('system')});
 		    fetch('/api/config').then(r=>r.json()).then(j=>{const d=j.data||{}; if(d.cf_enabled&&d.cf_site_key){cfLoginEnabled.value=true; adminCFKey=d.cf_site_key; nextTick(()=>{ensureAdminTurnstileScript();renderAdminTurnstile()})} if(d.captcha_enabled&&d.captcha_provider==='cap'&&d.cap_api_endpoint){captchaLoginEnabled.value=true; adminCaptchaCfg={enabled:true,capEndpoint:d.cap_api_endpoint}; nextTick(renderAdminCap)}}).catch(()=>{});
 
@@ -187,7 +195,12 @@ createApp({
       feishu: s.feishu, feishu_webhook: s.feishu_webhook, feishu_secret: s.feishu_secret,
       telegram: s.telegram, tg_token: s.tg_token, tg_chat: s.tg_chat,
       dingtalk: s.dingtalk, ding_webhook: s.ding_webhook, ding_secret: s.ding_secret,
-      rate_create: s.rate_create, rate_redirect: s.rate_redirect,
+      wecom: s.wecom, wecom_webhook: s.wecom_webhook,
+      bark: s.bark, bark_key: s.bark_key, bark_endpoint: s.bark_endpoint,
+      discord: s.discord, discord_webhook: s.discord_webhook,
+      email: s.email, email_host: s.email_host, email_port: s.email_port, email_user: s.email_user, email_pass: s.email_pass, email_from: s.email_from, email_to: s.email_to,
+      webhook: s.webhook, webhook_url: s.webhook_url, webhook_secret: s.webhook_secret,
+      rate_create: s.rate_create, rate_redirect: s.rate_redirect, rate_whitelist: s.rate_whitelist,
       bg_url: s.bg_url, bg_type: s.bg_type,
       mod_enabled: s.mod_enabled, mod_openai_key: s.mod_openai_key, mod_auto_delete: s.mod_auto_delete,
       bot_mode: s.bot_mode, bot_min_trust: s.bot_min_trust, bot_min_reports: s.bot_min_reports, bot_max_auto_daily: s.bot_max_auto_daily,
@@ -205,6 +218,24 @@ createApp({
         s.public_messages = messages;
         await api(b('/api/settings'),{method:'PUT',body:JSON.stringify({settings:JSON.stringify({public_messages:messages})})});
         ElMessage.success(lang.value==='en'?'User messages saved':'用户消息已保存');
+      } catch(e){ ElMessage.error(e.message); }
+    };
+    const doSaveSecurityLimits = async () => {
+      try {
+        const payload = {
+          rate_create: Math.max(1, Math.round(Number(s.rate_create) || 0)),
+          rate_redirect: Math.max(1, Math.round(Number(s.rate_redirect) || 0)),
+          rate_whitelist: (s.rate_whitelist || '').trim(),
+          report_min_interval: Math.max(1, Math.round(Number(s.report_min_interval) || 0)),
+          report_daily_limit: Math.max(1, Math.round(Number(s.report_daily_limit) || 0)),
+        };
+        s.rate_create = payload.rate_create;
+        s.rate_redirect = payload.rate_redirect;
+        s.rate_whitelist = payload.rate_whitelist;
+        s.report_min_interval = payload.report_min_interval;
+        s.report_daily_limit = payload.report_daily_limit;
+        await api(b('/api/settings'),{method:'PUT',body:JSON.stringify({settings:JSON.stringify(payload)})});
+        ElMessage.success(lang.value==='en'?'Rate limits saved':'速率限制已保存');
       } catch(e){ ElMessage.error(e.message); }
     };
 
@@ -232,12 +263,12 @@ createApp({
     };
 
     const memPercent = computed(() => st.container_limit_known ? st.container_pct : (st.mem_sys > 0 ? Math.min(100, Math.round(st.mem_alloc / st.mem_sys * 100)) : 0));
-    const rateCreatePct = computed(() => Math.min(100, Math.round(s.rate_create / 60 * 100)));
-    const rateRedirectPct = computed(() => Math.min(100, Math.round(s.rate_redirect / 200 * 100)));
+    const rateCreatePct = computed(() => Math.min(100, Math.round(Number(s.rate_create) || 0)));
+    const rateRedirectPct = computed(() => Math.min(100, Math.round(Number(s.rate_redirect) || 0)));
 
     return { isLogin,cp,loading,lu,lp,lt,le,cfLoginEnabled,captchaLoginEnabled,dash,st,links,keys,bans,reports,totpUri,s,appVersion,
       doLogin,doLogout,nav,ldLinks,delLink,ldKeys,createKey,revokeKey,delKey,ldBans,doUnban,ldReports,doHandle,doAuto,
-      ldSettings,doSave,doSaveMessages,doRotate,doReload,memPercent,rateCreatePct,rateRedirectPct,themeMode,lang,setThemeMode,setLang,tt,totpCode,totpVerified,totpLoading,doVerifyTOTP,addPublicMessage,removePublicMessage,auditLogs,domains,addDomain,delDomain,TTL_PRESETS,ttlLabel,toggleTTLOption,ttlSummary };
+      ldSettings,doSave,doSaveMessages,doSaveSecurityLimits,doRotate,doReload,memPercent,rateCreatePct,rateRedirectPct,themeMode,lang,setThemeMode,setLang,tt,L,totpCode,totpVerified,totpLoading,doVerifyTOTP,addPublicMessage,removePublicMessage,auditLogs,domains,addDomain,delDomain,TTL_PRESETS,ttlLabel,toggleTTLOption,ttlSummary };
   },
   template: `
   <!-- LOGIN -->
@@ -248,7 +279,7 @@ createApp({
       <div class="sub">{{tt('loginSub')}}</div>
       <div class="fi"><label>{{tt('username')}}</label><input v-model="lu" type="text" placeholder="admin" autocomplete="username" @keyup.enter="doLogin"></div>
       <div class="fi"><label>{{tt('password')}}</label><input v-model="lp" type="password" placeholder="••••••••" autocomplete="current-password" @keyup.enter="doLogin"></div>
-      <div class="fi"><label>{{tt('totp')}}</label><input v-model="lt" type="text" placeholder="可选 · 6位数字" maxlength="6" autocomplete="off" @keyup.enter="doLogin"></div>
+      <div class="fi"><label>{{tt('totp')}}</label><input v-model="lt" type="text" :placeholder="L('可选 · 6位数字','Optional · 6 digits')" maxlength="6" autocomplete="off" @keyup.enter="doLogin"></div>
       <div v-if="captchaLoginEnabled" style="display:flex;justify-content:center;margin:8px 0"><cap-widget id="admin-cap-widget"></cap-widget></div><div v-if="cfLoginEnabled" style="display:flex;justify-content:center;margin:8px 0"><div id="admin-cf-widget"></div></div>
       <div class="err">{{ le }}</div>
       <button class="btn" @click="doLogin" :disabled="loading">{{ loading ? tt('verifying') : tt('login') }}</button>
@@ -345,7 +376,7 @@ createApp({
             <div class="sec-metric"><span class="k">运行时间</span><span class="v">{{st.uptime}}</span></div>
             <div class="sec-metric"><span class="k">Goroutines</span><span class="v">{{st.goroutines}}</span></div>
             <div class="sec-metric"><span class="k">GC 次数</span><span class="v">{{st.num_gc}}</span></div>
-            <div class="sec-metric"><span class="k">上次 GC 距今</span><span class="v">{{st.last_gc_seconds>=0 ? st.last_gc_seconds + ' 秒' : '暂无'}}</span></div>
+            <div class="sec-metric"><span class="k">{{L('上次 GC 距今','Last GC')}}</span><span class="v">{{st.last_gc_seconds>=0 ? st.last_gc_seconds + L(' 秒',' s') : L('暂无','None')}}</span></div>
             <div class="sec-metric"><span class="k">管理后缀</span><span class="v">/{{st.suffix}}/</span></div>
           </div>
         </div>
@@ -354,23 +385,23 @@ createApp({
       <!-- LINKS -->
       <div v-if="cp==='links'">
         <h2>{{tt('links')}}</h2>
-        <p class="page-desc">查看和管理所有短链</p>
+        <p class="page-desc">{{L('查看和管理所有短链','View and manage all short links')}}</p>
         <div class="alert alert-info">🔒 为保护用户隐私，管理员仅可查看短码与点击数，无法查看原始链接。</div>
         <table><tr><th>短码</th><th>点击量</th><th>{{tt('password')}}</th><th>创建时间</th><th>操作</th></tr>
         <tr v-for="l in links" :key="l.short_code">
           <td><span class="tag">{{l.short_code}}</span></td><td style="font-weight:600">{{l.click_count}}</td><td>{{l.has_password?'🔒 是':'—'}}</td><td style="color:var(--t2)">{{l.created_at}}</td>
           <td><button class="btn2" @click="delLink(l.short_code)">删除</button></td>
         </tr>
-        <tr v-if="links.length===0"><td colspan="5" style="text-align:center;padding:40px;color:var(--t3)">暂无短链数据</td></tr>
+        <tr v-if="links.length===0"><td colspan="5" style="text-align:center;padding:40px;color:var(--t3)">{{L('暂无短链数据','No short links yet')}}</td></tr>
         </table>
       </div>
 
       <!-- REPORTS -->
       <div v-if="cp==='reports'">
         <h2>{{tt('reports')}}</h2>
-        <p class="page-desc">处理用户提交的举报内容</p>
+        <p class="page-desc">{{L('处理用户提交的举报内容','Handle user-submitted reports')}}</p>
         <div style="margin-bottom:16px"><button class="btn1" @click="doAuto">🤖 自动处理</button></div>
-        <div v-if="reports.length===0" class="empty"><div class="icon">✨</div><div class="text">暂无待处理举报，一切正常</div></div>
+        <div v-if="reports.length===0" class="empty"><div class="icon">✨</div><div class="text">{{L('暂无待处理举报，一切正常','No pending reports. Everything looks good.')}}</div></div>
         <div v-for="r in reports" :key="r.id" class="report-row">
           <div class="ri">
             <div class="code">{{r.short_code}}</div>
@@ -387,7 +418,7 @@ createApp({
       <!-- API KEYS -->
       <div v-if="cp==='apikeys'">
         <h2>API Keys</h2>
-        <p class="page-desc">管理外部接入密钥</p>
+        <p class="page-desc">{{L('管理外部接入密钥','Manage external API keys')}}</p>
         <div style="margin-bottom:16px"><button class="btn1" @click="createKey">+ 创建新 Key</button></div>
         <table><tr><th>名称</th><th>用途</th><th>权限</th><th>每日额度</th><th>状态</th><th>操作</th></tr>
         <tr v-for="k in keys" :key="k.id">
@@ -395,134 +426,136 @@ createApp({
           <td><span :style="{color:k.revoked?'var(--danger)':'var(--success)',fontWeight:600,fontSize:'12px'}">{{k.revoked?'已吊销':'正常'}}</span></td>
           <td><button class="btn3" @click="revokeKey(k.id)">吊销</button> <button class="btn2" @click="delKey(k.id)">删除</button></td>
         </tr>
-        <tr v-if="keys.length===0"><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">暂无 API Key</td></tr>
+        <tr v-if="keys.length===0"><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">{{L('暂无 API Key','No API keys yet')}}</td></tr>
         </table>
       </div>
 
       <!-- SECURITY CENTER -->
       <div v-if="cp==='security'">
         <h2>{{tt('securityCenter')}}</h2>
-        <p class="page-desc">网络安全模块总览与管理</p>
+        <p class="page-desc">{{L('网络安全模块总览与管理','Security overview and management')}}</p>
 
         <div class="sec-grid">
-          <!-- Rate Limit Card -->
           <div class="sec-card">
             <div class="sec-card-header">
-              <div class="sec-card-title">🚦 速率限制</div>
-              <span class="sec-card-status ok">运行中</span>
+              <div class="sec-card-title">🚦 {{L('速率限制','Rate limits')}}</div>
+              <span class="sec-card-status ok">{{L('运行中','Running')}}</span>
             </div>
             <div class="sec-card-body">
-              <div class="sec-metric"><span class="k">创建限制</span><span class="v">{{s.rate_create}} 次/分</span></div>
+              <div class="sec-metric"><span class="k">{{L('创建限制','Create limit')}}</span><span class="v">{{s.rate_create}} {{L('次/分','/ min')}}</span></div>
               <div class="sec-bar"><div class="sec-bar-fill" :style="{width:rateCreatePct+'%',background:'#6366f1'}"></div></div>
-              <div class="sec-metric"><span class="k">跳转限制</span><span class="v">{{s.rate_redirect}} 次/分</span></div>
+              <div class="sec-metric"><span class="k">{{L('跳转限制','Redirect limit')}}</span><span class="v">{{s.rate_redirect}} {{L('次/分','/ min')}}</span></div>
               <div class="sec-bar"><div class="sec-bar-fill" :style="{width:rateRedirectPct+'%',background:'#8b5cf6'}"></div></div>
+              <div class="frow">
+                <div class="fi"><label>{{L('创建/分钟','Creates per minute')}}</label><input type="number" v-model.number="s.rate_create" min="1" step="1"></div>
+                <div class="fi"><label>{{L('跳转/分钟','Redirects per minute')}}</label><input type="number" v-model.number="s.rate_redirect" min="1" step="1"></div>
+              </div>
+              <div class="frow">
+                <div class="fi"><label>{{L('白名单 IP/CIDR','Whitelist IP/CIDR')}}</label><input v-model="s.rate_whitelist" placeholder="127.0.0.1,10.0.0.0/8"></div>
+                <div class="fi"><label>{{L('举报间隔（秒）','Report interval (s)')}}</label><input type="number" v-model.number="s.report_min_interval" min="1" step="1"></div>
+                <div class="fi"><label>{{L('每日举报上限/IP','Daily reports/IP')}}</label><input type="number" v-model.number="s.report_daily_limit" min="1" step="1"></div>
+              </div>
+              <div style="margin-top:12px">
+                <button class="btn1" style="width:100%" @click="doSaveSecurityLimits">💾 {{L('保存速率限制','Save rate limits')}}</button>
+              </div>
             </div>
           </div>
 
-          <!-- Ban Status Card -->
           <div class="sec-card">
             <div class="sec-card-header">
-              <div class="sec-card-title">🚫 IP 封禁</div>
-              <span class="sec-card-status" :class="dash.ab>0?'warn':'ok'">{{dash.ab>0?dash.ab+' 个活跃':'无封禁'}}</span>
+              <div class="sec-card-title">🚫 {{L('IP 封禁','IP bans')}}</div>
+              <span class="sec-card-status" :class="dash.ab>0?'warn':'ok'">{{dash.ab>0?(lang==='en'?dash.ab+' active':dash.ab+' 个活跃'):(lang==='en'?'None':'无封禁')}}</span>
             </div>
             <div class="sec-card-body">
-              <div class="sec-metric"><span class="k">活跃封禁</span><span class="v" style="color:var(--danger)">{{dash.ab}}</span></div>
-              <div class="sec-metric"><span class="k">时区处理</span><span class="v" style="color:var(--success)">UTC 统一</span></div>
-              <div class="sec-metric"><span class="k">自动封禁</span><span class="v">规则驱动</span></div>
+              <div class="sec-metric"><span class="k">{{L('活跃封禁','Active bans')}}</span><span class="v" style="color:var(--danger)">{{dash.ab}}</span></div>
+              <div class="sec-metric"><span class="k">{{L('时区处理','Timezone')}}</span><span class="v" style="color:var(--success)">UTC</span></div>
+              <div class="sec-metric"><span class="k">{{L('自动封禁','Auto ban')}}</span><span class="v">{{L('规则驱动','Rule-driven')}}</span></div>
             </div>
             <div style="margin-top:12px">
-              <button class="btn3" style="width:100%" @click="nav('security')">查看封禁列表 ↓</button>
+              <button class="btn3" style="width:100%" @click="nav('security')">{{L('查看封禁列表 ↓','View bans ↓')}}</button>
             </div>
           </div>
 
-          <!-- Encryption Card -->
           <div class="sec-card">
             <div class="sec-card-header">
-              <div class="sec-card-title">🔐 数据加密</div>
+              <div class="sec-card-title">🔐 {{L('数据加密','Encryption')}}</div>
               <span class="sec-card-status ok">AES-256-GCM</span>
             </div>
             <div class="sec-card-body">
-              <div class="sec-metric"><span class="k">链接 URL</span><span class="v" style="color:var(--success)">✓ 加密</span></div>
-              <div class="sec-metric"><span class="k">TOTP 密钥</span><span class="v" style="color:var(--success)">✓ 加密</span></div>
-              <div class="sec-metric"><span class="k">设置存储</span><span class="v" style="color:var(--success)">✓ 加密</span></div>
-              <div class="sec-metric"><span class="k">IP 地址</span><span class="v" style="color:var(--success)">✓ HMAC 哈希</span></div>
+              <div class="sec-metric"><span class="k">{{L('链接 URL','Link URL')}}</span><span class="v" style="color:var(--success)">{{L('✓ 加密','Encrypted')}}</span></div>
+              <div class="sec-metric"><span class="k">TOTP</span><span class="v" style="color:var(--success)">{{L('✓ 加密','Encrypted')}}</span></div>
+              <div class="sec-metric"><span class="k">{{L('设置存储','Settings storage')}}</span><span class="v" style="color:var(--success)">{{L('✓ 加密','Encrypted')}}</span></div>
+              <div class="sec-metric"><span class="k">{{L('IP 地址','IP address')}}</span><span class="v" style="color:var(--success)">{{L('✓ HMAC 哈希','✓ HMAC hash')}}</span></div>
             </div>
           </div>
 
-          <!-- Word Filter Card -->
           <div class="sec-card">
             <div class="sec-card-header">
-              <div class="sec-card-title">📝 敏感词过滤</div>
-              <span class="sec-card-status ok">DFA 引擎</span>
+              <div class="sec-card-title">📝 {{L('敏感词过滤','Word filter')}}</div>
+              <span class="sec-card-status ok">DFA</span>
             </div>
             <div class="sec-card-body">
-              <div class="sec-metric"><span class="k">过滤引擎</span><span class="v">DFA 确定性有限自动机</span></div>
-              <div class="sec-metric"><span class="k">拦截方式</span><span class="v">实时阻断</span></div>
-              <div class="sec-metric"><span class="k">词库来源</span><span class="v">data/default-words.txt</span></div>
+              <div class="sec-metric"><span class="k">{{L('过滤引擎','Engine')}}</span><span class="v">DFA</span></div>
+              <div class="sec-metric"><span class="k">{{L('拦截方式','Mode')}}</span><span class="v">{{L('实时阻断','Realtime block')}}</span></div>
+              <div class="sec-metric"><span class="k">{{L('词库来源','Word list')}}</span><span class="v">data/default-words.txt</span></div>
             </div>
             <div style="margin-top:12px">
-              <button class="btn1" style="width:100%" @click="doReload">🔄 重载词库</button>
+              <button class="btn1" style="width:100%" @click="doReload">🔄 {{L('重载词库','Reload word list')}}</button>
             </div>
           </div>
 
-          <!-- Admin Suffix Card -->
           <div class="sec-card">
             <div class="sec-card-header">
-              <div class="sec-card-title">🎯 后缀轮换</div>
-              <span class="sec-card-status ok">已启用</span>
+              <div class="sec-card-title">🎯 {{L('后缀轮换','Suffix rotation')}}</div>
+              <span class="sec-card-status ok">{{L('已启用','Enabled')}}</span>
             </div>
             <div class="sec-card-body">
-              <div class="sec-metric"><span class="k">当前后缀</span><span class="v">/{{s.suffix||st.suffix}}/</span></div>
-              <div class="sec-metric"><span class="k">路由模式</span><span class="v">原子热切换</span></div>
-              <div class="sec-metric"><span class="k">防护目的</span><span class="v">隐藏管理入口</span></div>
+              <div class="sec-metric"><span class="k">{{L('当前后缀','Current suffix')}}</span><span class="v">/{{s.suffix||st.suffix}}/</span></div>
+              <div class="sec-metric"><span class="k">{{L('路由模式','Routing')}}</span><span class="v">{{L('原子热切换','Atomic swap')}}</span></div>
+              <div class="sec-metric"><span class="k">{{L('防护目的','Purpose')}}</span><span class="v">{{L('隐藏管理入口','Hide admin entry')}}</span></div>
             </div>
             <div style="margin-top:12px">
-              <button class="btn3" style="width:100%;color:var(--warn);border-color:rgba(245,158,11,.3)" @click="doRotate">⚡ 紧急轮换后缀</button>
+              <button class="btn3" style="width:100%;color:var(--warn);border-color:rgba(245,158,11,.3)" @click="doRotate">⚡ {{L('紧急轮换后缀','Rotate suffix now')}}</button>
             </div>
           </div>
 
-          <!-- CSP Card -->
           <div class="sec-card">
             <div class="sec-card-header">
-              <div class="sec-card-title">🌐 内容安全策略</div>
-              <span class="sec-card-status ok">CSP 激活</span>
+              <div class="sec-card-title">🌐 {{L('内容安全策略','CSP')}}</div>
+              <span class="sec-card-status ok">CSP</span>
             </div>
             <div class="sec-card-body">
               <div class="sec-metric"><span class="k">script-src</span><span class="v">'self' + CDN</span></div>
-              <div class="sec-metric"><span class="k">img-src</span><span class="v">动态白名单</span></div>
-              <div class="sec-metric"><span class="k">XSS 防护</span><span class="v" style="color:var(--success)">✓ 启用</span></div>
-              <div class="sec-metric"><span class="k">点击劫持</span><span class="v" style="color:var(--success)">✓ X-Frame-Options</span></div>
+              <div class="sec-metric"><span class="k">img-src</span><span class="v">{{L('动态白名单','Dynamic allowlist')}}</span></div>
+              <div class="sec-metric"><span class="k">XSS</span><span class="v" style="color:var(--success)">{{L('✓ 启用','Enabled')}}</span></div>
+              <div class="sec-metric"><span class="k">{{L('点击劫持','Clickjacking')}}</span><span class="v" style="color:var(--success)">X-Frame-Options</span></div>
             </div>
           </div>
         </div>
 
-        <!-- Ban List -->
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><div class="dot" style="background:var(--danger)"></div>封禁列表</div>
+            <div class="panel-title"><div class="dot" style="background:var(--danger)"></div>{{L('封禁列表','Ban list')}}</div>
           </div>
-          <table v-if="bans.length>0"><tr><th>封禁原因</th><th>解封时间</th><th>操作</th></tr>
-          <tr v-for="b in bans" :key="b.id"><td>{{b.reason}}</td><td style="color:var(--t2)">{{b.ban_until}}</td><td><button class="btn1" style="padding:6px 14px;font-size:11px" @click="doUnban(b.id)">解封</button></td></tr></table>
-          <div v-else class="empty" style="padding:30px"><div class="text" style="color:var(--success)">✓ 当前无活跃封禁</div></div>
+          <table v-if="bans.length>0"><tr><th>{{L('封禁原因','Reason')}}</th><th>{{L('解封时间','Unban at')}}</th><th>{{L('操作','Action')}}</th></tr>
+          <tr v-for="b in bans" :key="b.id"><td>{{b.reason}}</td><td style="color:var(--t2)">{{b.ban_until}}</td><td><button class="btn1" style="padding:6px 14px;font-size:11px" @click="doUnban(b.id)">{{L('解封','Unban')}}</button></td></tr></table>
+          <div v-else class="empty" style="padding:30px"><div class="text" style="color:var(--success)">✓ {{L('当前无活跃封禁','No active bans')}}</div></div>
         </div>
       </div>
-
-
-
       <div v-if="cp==='audit'">
-        <h2>审计日志</h2><p class="page-desc">查看管理员、API Key 和系统关键操作记录</p>
-        <table><tr><th>时间</th><th>操作者</th><th>动作</th><th>资源</th><th>元数据</th></tr><tr v-for="a in auditLogs" :key="a.id"><td>{{a.created_at}}</td><td>{{a.actor_type}}/{{a.actor_id}}</td><td>{{a.action}}</td><td>{{a.resource}} {{a.resource_id}}</td><td style="max-width:320px;word-break:break-all">{{a.metadata}}</td></tr><tr v-if="auditLogs.length===0"><td colspan="5" style="text-align:center;padding:40px;color:var(--t3)">暂无审计日志</td></tr></table>
+        <h2>{{L('审计日志','Audit logs')}}</h2><p class="page-desc">{{L('查看管理员、API Key 和系统关键操作记录','View admin, API key, and system critical actions')}}</p>
+        <table><tr><th>{{L('时间','Time')}}</th><th>{{L('操作者','Actor')}}</th><th>{{L('动作','Action')}}</th><th>{{L('资源','Resource')}}</th><th>{{L('元数据','Metadata')}}</th></tr><tr v-for="a in auditLogs" :key="a.id"><td>{{a.created_at}}</td><td>{{a.actor_type}}/{{a.actor_id}}</td><td>{{a.action}}</td><td>{{a.resource}} {{a.resource_id}}</td><td style="max-width:320px;word-break:break-all">{{a.metadata}}</td></tr><tr v-if="auditLogs.length===0"><td colspan="5" style="text-align:center;padding:40px;color:var(--t3)">{{L('暂无审计日志','No audit logs')}}</td></tr></table>
       </div>
 
       <div v-if="cp==='domains'">
-        <h2>多域名</h2><p class="page-desc">管理短链域名；第一版短码仍全局唯一</p><div style="margin-bottom:16px"><button class="btn1" @click="addDomain">+ 添加域名</button></div>
-        <table><tr><th>域名</th><th>用途</th><th>默认</th><th>HTTPS</th><th>状态</th><th>操作</th></tr><tr v-for="d in domains" :key="d.id"><td>{{d.hostname}}</td><td>{{d.purpose}}</td><td>{{d.is_default?'是':'否'}}</td><td>{{d.force_https?'是':'否'}}</td><td>{{d.enabled?'启用':'关闭'}}</td><td><button class="btn2" @click="delDomain(d.id)">删除</button></td></tr><tr v-if="domains.length===0"><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">暂无域名</td></tr></table>
+        <h2>{{L('多域名','Domains')}}</h2><p class="page-desc">{{L('管理短链域名；第一版短码仍全局唯一','Manage short-link domains; short codes remain globally unique')}}</p><div style="margin-bottom:16px"><button class="btn1" @click="addDomain">+ {{L('添加域名','Add domain')}}</button></div>
+        <table><tr><th>{{L('域名','Domain')}}</th><th>{{L('用途','Purpose')}}</th><th>{{L('默认','Default')}}</th><th>HTTPS</th><th>{{L('状态','Status')}}</th><th>{{L('操作','Action')}}</th></tr><tr v-for="d in domains" :key="d.id"><td>{{d.hostname}}</td><td>{{d.purpose}}</td><td>{{d.is_default?L('是','Yes'):L('否','No')}}</td><td>{{d.force_https?L('是','Yes'):L('否','No')}}</td><td>{{d.enabled?L('启用','Enabled'):L('关闭','Disabled')}}</td><td><button class="btn2" @click="delDomain(d.id)">{{L('删除','Delete')}}</button></td></tr><tr v-if="domains.length===0"><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">{{L('暂无域名','No domains')}}</td></tr></table>
       </div>
 
       <!-- SETTINGS -->
       <div v-if="cp==='settings'">
         <h2>{{tt('settings')}}</h2>
-        <p class="page-desc">配置系统参数与集成</p>
+        <p class="page-desc">{{L('配置系统参数与集成','Configure system parameters and integrations')}}</p>
 
         <div class="totp-setup">
           <div id="qr-totp" class="totp-box"></div>
@@ -537,71 +570,71 @@ createApp({
           </div>
         </div>
 
-        <div class="section">📌 版本信息</div>
+        <div class="section">{{L('📌 版本信息','📌 Version info')}}</div>
         <div class="frow">
-          <div class="fi" style="flex:2"><label>当前运行版本</label><input v-model="s.version" placeholder="BETA2.0-ALPHA"></div>
-          <div class="fi"><label>说明</label><div style="padding-top:8px;color:var(--t3);font-size:12px">保存后即时生效，用户页将同步显示</div></div>
+          <div class="fi" style="flex:2"><label>{{L('当前运行版本','Current version')}}</label><input v-model="s.version" placeholder="BETA2.0-ALPHA"></div>
+          <div class="fi"><label>{{L('说明','Note')}}</label><div style="padding-top:8px;color:var(--t3);font-size:12px">{{L('保存后即时生效，用户页将同步显示','Takes effect immediately and appears on the public page')}}</div></div>
         </div>
-        <div class="section">🌐 网页图标</div>
-        <div class="frow"><div class="fi" style="flex:2"><label>网页图标 URL</label><input v-model="s.favicon_url" placeholder="https://example.com/favicon.png"></div><div class="fi"><label>预览</label><div style="padding-top:8px;color:var(--t3);font-size:12px">支持 PNG/SVG/ICO，保存后用户页和后台都会生效</div></div></div>
+        <div class="section">{{L('🌐 网页图标','🌐 Favicon')}}</div>
+        <div class="frow"><div class="fi" style="flex:2"><label>{{L('网页图标 URL','Favicon URL')}}</label><input v-model="s.favicon_url" placeholder="https://example.com/favicon.png"></div><div class="fi"><label>{{L('预览','Preview')}}</label><div style="padding-top:8px;color:var(--t3);font-size:12px">{{L('支持 PNG/SVG/ICO，保存后用户页和后台都会生效','PNG / SVG / ICO are supported and apply to both public and admin pages')}}</div></div></div>
 
-        <div class="section">📣 用户消息</div>
+        <div class="section">{{L('📣 用户消息','📣 Public messages')}}</div>
         <div class="panel" style="padding:18px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div style="color:var(--t2);font-size:13px">在这里维护多条用户页公告；启用后会显示在用户页独立公告区域，不会混入创建表单。</div>
+            <div style="color:var(--t2);font-size:13px">{{L('在这里维护多条用户页公告；启用后会显示在用户页独立公告区域，不会混入创建表单。','Maintain multiple public notices here; enabled notices appear in a separate notice area on the public page.')}}</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-              <button class="btn3" style="padding:8px 14px" @click="doSaveMessages">💾 保存用户消息</button>
-              <button class="btn1" style="padding:8px 14px" @click="addPublicMessage">+ 添加消息</button>
+              <button class="btn3" style="padding:8px 14px" @click="doSaveMessages">💾 {{L('保存用户消息','Save messages')}}</button>
+              <button class="btn1" style="padding:8px 14px" @click="addPublicMessage">+ {{L('添加消息','Add message')}}</button>
             </div>
           </div>
-          <div v-if="!s.public_messages || s.public_messages.length===0" style="padding:20px;text-align:center;color:var(--t3);border:1px dashed var(--border);border-radius:12px">暂无消息</div>
+          <div v-if="!s.public_messages || s.public_messages.length===0" style="padding:20px;text-align:center;color:var(--t3);border:1px dashed var(--border);border-radius:12px">{{L('暂无消息','No messages')}}</div>
           <div v-for="(m,i) in s.public_messages" :key="i" style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--bg)">
             <div class="frow" style="align-items:flex-end">
-              <div class="fi" style="min-width:120px;flex:.4"><label>启用</label><select v-model="m.enabled"><option :value="true">启用</option><option :value="false">关闭</option></select></div>
-              <div class="fi" style="min-width:140px;flex:.5"><label>类型</label><select v-model="m.level"><option value="info">信息</option><option value="success">成功</option><option value="warn">警告</option><option value="danger">重要</option></select></div>
-              <div class="fi" style="flex:1"><label>标题</label><input v-model="m.title" placeholder="例如：系统公告"></div>
-              <div class="fi" style="flex:.2"><label>操作</label><button class="btn2" style="width:100%" @click="removePublicMessage(i)">删除</button></div>
+              <div class="fi" style="min-width:120px;flex:.4"><label>{{L('启用','Enabled')}}</label><select v-model="m.enabled"><option :value="true">{{L('启用','Enabled')}}</option><option :value="false">{{L('关闭','Disabled')}}</option></select></div>
+              <div class="fi" style="min-width:140px;flex:.5"><label>{{L('类型','Type')}}</label><select v-model="m.level"><option value="info">{{L('信息','Info')}}</option><option value="success">{{L('成功','Success')}}</option><option value="warn">{{L('警告','Warning')}}</option><option value="danger">{{L('重要','Important')}}</option></select></div>
+              <div class="fi" style="flex:1"><label>{{L('标题','Title')}}</label><input v-model="m.title" :placeholder="L('例如：系统公告','e.g. System notice')"></div>
+              <div class="fi" style="flex:.2"><label>{{L('操作','Action')}}</label><button class="btn2" style="width:100%" @click="removePublicMessage(i)">{{L('删除','Delete')}}</button></div>
             </div>
-            <div class="fi"><label>消息内容</label><input v-model="m.content" maxlength="300" placeholder="输入要展示给用户的消息，最多 300 字"></div>
+            <div class="fi"><label>{{L('消息内容','Message content')}}</label><input v-model="m.content" maxlength="300" :placeholder="L('输入要展示给用户的消息，最多 300 字','Enter a message shown to users, up to 300 characters')"></div>
           </div>
         </div>
 
-        <div class="section">🎯 管理入口</div>
+        <div class="section">{{L('🎯 管理入口','🎯 Admin entry')}}</div>
         <div class="frow">
-          <div class="fi" style="flex:2"><label>当前管理后缀</label><div style="display:flex;align-items:center;gap:12px;padding-top:4px"><span class="tag" style="font-size:14px">/{{s.suffix}}/</span><button class="btn3" @click="doRotate">🔄 更换后缀</button></div></div>
-          <div class="fi"><label>短链默认长度</label><input type="number" v-model.number="s.shortlink_length" min="4" max="12"></div>
+          <div class="fi" style="flex:2"><label>{{L('当前管理后缀','Current admin suffix')}}</label><div style="display:flex;align-items:center;gap:12px;padding-top:4px"><span class="tag" style="font-size:14px">/{{s.suffix}}/</span><button class="btn3" @click="doRotate">🔄 {{L('更换后缀','Change suffix')}}</button></div></div>
+          <div class="fi"><label>{{L('短链默认长度','Default short code length')}}</label><input type="number" v-model.number="s.shortlink_length" min="4" max="12"></div>
         </div>
 
 
-        <div class="section">⏰ 链接有效期策略</div>
-        <div class="frow"><div class="fi"><label>允许永不过期</label><select v-model="s.ttl_allow_never"><option :value="true">允许</option><option :value="false">禁止</option></select><div class="hint">关闭后，系统会自动使用默认有效期，前台也不会显示“永不过期”。</div></div><div class="fi"><label>默认有效期</label><select v-model.number="s.ttl_default_seconds"><option v-if="s.ttl_allow_never" :value="0">永不过期</option><option v-for="p in TTL_PRESETS.filter(x=>x.value>0)" :key="'d'+p.value" :value="p.value">{{p.label}}</option><option :value="s.ttl_custom_default">自定义：{{ttlLabel(s.ttl_custom_default)}}</option></select><input v-model.number="s.ttl_custom_default" type="number" min="60" placeholder="自定义默认秒数"></div><div class="fi"><label>最大有效期</label><select v-model.number="s.ttl_max_seconds"><option v-for="p in TTL_PRESETS.filter(x=>x.value>0)" :key="'m'+p.value" :value="p.value">{{p.label}}</option><option :value="s.ttl_custom_max">自定义：{{ttlLabel(s.ttl_custom_max)}}</option></select><input v-model.number="s.ttl_custom_max" type="number" min="60" placeholder="自定义最大秒数"></div></div>
-        <div class="fi"><label>前台可选有效期</label><div class="ttl-pills"><button type="button" v-for="p in TTL_PRESETS" :key="p.value" class="ttl-pill" :class="{on:(s.ttl_options_selected||[]).includes(p.value)}" v-show="p.value>0 || s.ttl_allow_never" @click="toggleTTLOption(p.value)">{{p.label}}</button></div><div class="hint">{{ttlSummary}}</div></div>
+        <div class="section">{{L('⏰ 链接有效期策略','⏰ Link expiration policy')}}</div>
+        <div class="frow"><div class="fi"><label>{{L('允许永不过期','Allow never expire')}}</label><select v-model="s.ttl_allow_never"><option :value="true">{{L('允许','Allow')}}</option><option :value="false">{{L('禁止','Disable')}}</option></select><div class="hint">{{L('关闭后，系统会自动使用默认有效期，前台也不会显示“永不过期”。','When disabled, the system falls back to the default expiration and the public page hides the never-expire option.')}}</div></div><div class="fi"><label>{{L('默认有效期','Default expiration')}}</label><select v-model.number="s.ttl_default_seconds"><option v-if="s.ttl_allow_never" :value="0">永不过期</option><option v-for="p in TTL_PRESETS.filter(x=>x.value>0)" :key="'d'+p.value" :value="p.value">{{p.label}}</option><option :value="s.ttl_custom_default">自定义：{{ttlLabel(s.ttl_custom_default)}}</option></select><input v-model.number="s.ttl_custom_default" type="number" min="60" placeholder="自定义默认秒数"></div><div class="fi"><label>{{L('最大有效期','Maximum expiration')}}</label><select v-model.number="s.ttl_max_seconds"><option v-for="p in TTL_PRESETS.filter(x=>x.value>0)" :key="'m'+p.value" :value="p.value">{{p.label}}</option><option :value="s.ttl_custom_max">自定义：{{ttlLabel(s.ttl_custom_max)}}</option></select><input v-model.number="s.ttl_custom_max" type="number" min="60" placeholder="自定义最大秒数"></div></div>
+        <div class="fi"><label>{{L('前台可选有效期','Public expiration choices')}}</label><div class="ttl-pills"><button type="button" v-for="p in TTL_PRESETS" :key="p.value" class="ttl-pill" :class="{on:(s.ttl_options_selected||[]).includes(p.value)}" v-show="p.value>0 || s.ttl_allow_never" @click="toggleTTLOption(p.value)">{{p.label}}</button></div><div class="hint">{{ttlSummary}}</div></div>
 
-        <div class="section">🛡️ 风险域名策略</div>
-        <div class="frow"><div class="fi"><label>启用跳转确认页</label><select v-model="s.risk_interstitial_enabled"><option :value="true">启用</option><option :value="false">关闭</option></select></div><div class="fi"><label>确认阈值</label><input type="number" v-model.number="s.risk_interstitial_threshold" min="0" max="100"></div><div class="fi"><label>阻断阈值</label><input type="number" v-model.number="s.risk_block_threshold" min="0" max="100"></div></div>
-        <div class="frow"><div class="fi"><label>域名白名单（一行一个）</label><input v-model="s.domain_allowlist" placeholder="example.com,*.trusted.com"></div><div class="fi"><label>域名黑名单（一行一个）</label><input v-model="s.domain_blocklist" placeholder="bad.com,*.bad.com"></div></div>
+        <div class="section">{{L('🛡️ 风险域名策略','🛡️ Risk domain policy')}}</div>
+        <div class="frow"><div class="fi"><label>{{L('启用跳转确认页','Enable interstitial')}}</label><select v-model="s.risk_interstitial_enabled"><option :value="true">{{L('启用','Enable')}}</option><option :value="false">{{L('关闭','Disable')}}</option></select></div><div class="fi"><label>{{L('确认阈值','Confirm threshold')}}</label><input type="number" v-model.number="s.risk_interstitial_threshold" min="0" max="100"></div><div class="fi"><label>{{L('阻断阈值','Block threshold')}}</label><input type="number" v-model.number="s.risk_block_threshold" min="0" max="100"></div></div>
+        <div class="frow"><div class="fi"><label>{{L('域名白名单（一行一个）','Domain allowlist (one per line)')}}</label><input v-model="s.domain_allowlist" placeholder="example.com,*.trusted.com"></div><div class="fi"><label>{{L('域名黑名单（一行一个）','Domain blocklist (one per line)')}}</label><input v-model="s.domain_blocklist" placeholder="bad.com,*.bad.com"></div></div>
 
-        <div class="section">▣ 二维码策略</div>
-        <div class="frow"><div class="fi"><label>创建后直接显示二维码</label><select v-model="s.qr_show_direct"><option :value="true">显示</option><option :value="false">隐藏</option></select><div class="hint">控制用户页创建成功后是否立即展示二维码。</div></div><div class="fi"><label>允许用户自定义文字</label><select v-model="s.qr_allow_user_customize"><option :value="true">允许</option><option :value="false">禁止</option></select><div class="hint">关闭后，用户/API 不能提交二维码文字。</div></div><div class="fi"><label>默认模板</label><select v-model="s.qr_default_template"><option value="classic">Classic</option><option value="card">Card</option><option value="compact">Compact</option></select><div class="hint">影响用户页二维码卡片样式。</div></div></div>
-        <div class="frow"><div class="fi"><label>默认二维码文字</label><input v-model="s.qr_default_text"></div><div class="fi"><label>Logo URL（仅管理员）</label><input v-model="s.qr_logo_url"></div><div class="fi"><label>启用 Logo</label><select v-model="s.qr_logo_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="section">{{L('▣ 二维码策略','▣ QR strategy')}}</div>
+        <div class="frow"><div class="fi"><label>{{L('创建后直接显示二维码','Show QR after create')}}</label><select v-model="s.qr_show_direct"><option :value="true">{{L('显示','Show')}}</option><option :value="false">{{L('隐藏','Hide')}}</option></select><div class="hint">{{L('控制用户页创建成功后是否立即展示二维码。','Controls whether the QR code appears immediately after creation.')}}</div></div><div class="fi"><label>{{L('允许用户自定义文字','Allow custom QR text')}}</label><select v-model="s.qr_allow_user_customize"><option :value="true">{{L('允许','Allow')}}</option><option :value="false">{{L('禁止','Disable')}}</option></select><div class="hint">{{L('关闭后，用户/API 不能提交二维码文字。','When disabled, users and API clients cannot submit QR text.')}}</div></div><div class="fi"><label>{{L('默认模板','Default template')}}</label><select v-model="s.qr_default_template"><option value="classic">Classic</option><option value="card">Card</option><option value="compact">Compact</option></select><div class="hint">{{L('影响用户页二维码卡片样式。','Controls the QR card style on the public page.')}}</div></div></div>
+        <div class="frow"><div class="fi"><label>{{L('默认二维码文字','Default QR text')}}</label><input v-model="s.qr_default_text"></div><div class="fi"><label>{{L('Logo URL（仅管理员）','Logo URL (admin only)')}}</label><input v-model="s.qr_logo_url"></div><div class="fi"><label>{{L('启用 Logo','Enable logo')}}</label><select v-model="s.qr_logo_enabled"><option :value="false">{{L('关闭','Disable')}}</option><option :value="true">{{L('启用','Enable')}}</option></select></div></div>
 
-        <div class="section">🚦 速率限制</div>
-        <div class="frow"><div class="fi"><label>创建/分钟</label><input type="number" v-model.number="s.rate_create" min="1"></div><div class="fi"><label>跳转/分钟</label><input type="number" v-model.number="s.rate_redirect" min="1"></div></div><div class="frow"><div class="fi"><label>白名单 IP/CIDR</label><input v-model="s.rate_whitelist" placeholder="127.0.0.1,10.0.0.0/8"></div><div class="fi"><label>说明</label><div style="padding-top:8px;color:var(--t3);font-size:12px">逗号分隔；匹配的 IP 不受速率限制影响</div></div></div>
+        <div class="section">{{L('🚦 速率限制','🚦 Rate limits')}}</div>
+        <div class="frow"><div class="fi"><label>{{L('创建/分钟','Creates per minute')}}</label><input type="number" v-model.number="s.rate_create" min="1"></div><div class="fi"><label>{{L('跳转/分钟','Redirects per minute')}}</label><input type="number" v-model.number="s.rate_redirect" min="1"></div></div><div class="frow"><div class="fi"><label>{{L('白名单 IP/CIDR','Whitelist IP/CIDR')}}</label><input v-model="s.rate_whitelist" placeholder="127.0.0.1,10.0.0.0/8"></div><div class="fi"><label>{{L('说明','Note')}}</label><div style="padding-top:8px;color:var(--t3);font-size:12px">{{L('逗号分隔；匹配的 IP 不受速率限制影响','Comma-separated; matching IPs are not rate-limited')}}</div></div></div>
 
-        <div class="section">🧩 验证码与风控</div>
-        <div class="captcha-lab"><div class="lab-title">双层验证策略</div><div class="lab-copy">Cap 负责日常低摩擦验证；连续失败或异常访问会自动升级到 Cloudflare Turnstile。PlayCaptcha 只保留为视觉实验，不参与后端安全判断。</div><span class="lab-pill">Cap 主力 · Turnstile 升级</span></div>
-        <div class="frow"><div class="fi"><label>启用验证码</label><select v-model="s.captcha_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select></div><div class="fi"><label>主力 Provider</label><select v-model="s.captcha_provider"><option value="cap">Cap Proof-of-Work</option></select></div><div class="fi"><label>模式</label><select v-model="s.captcha_mode"><option value="adaptive">自适应</option></select></div></div>
+        <div class="section">{{L('🧩 验证码与风控','🧩 Captcha and risk')}}</div>
+        <div class="captcha-lab"><div class="lab-title">{{L('双层验证策略','Dual verification strategy')}}</div><div class="lab-copy">{{L('Cap 负责日常低摩擦验证；连续失败或异常访问会自动升级到 Cloudflare Turnstile。PlayCaptcha 只保留为视觉实验，不参与后端安全判断。','Cap handles lightweight daily verification; repeated failures or suspicious activity escalate to Cloudflare Turnstile. PlayCaptcha stays experimental and is not trusted for backend security.')}}</div><span class="lab-pill">Cap · Turnstile</span></div>
+        <div class="frow"><div class="fi"><label>{{L('启用验证码','Enable captcha')}}</label><select v-model="s.captcha_enabled"><option :value="false">{{L('关闭','Disable')}}</option><option :value="true">{{L('启用','Enable')}}</option></select></div><div class="fi"><label>{{L('主力 Provider','Primary provider')}}</label><select v-model="s.captcha_provider"><option value="cap">Cap Proof-of-Work</option></select></div><div class="fi"><label>{{L('模式','Mode')}}</label><select v-model="s.captcha_mode"><option value="adaptive">{{L('自适应','Adaptive')}}</option></select></div></div>
         <div v-if="s.captcha_enabled" class="frow"><div class="fi"><label>Cap Site Key</label><input v-model="s.cap_site_key" placeholder="Cap site key"></div><div class="fi"><label>Cap API Endpoint</label><input v-model="s.cap_api_endpoint" placeholder="https://cap.example.com/site-key/"></div><div class="fi"><label>Cap Verify URL</label><input v-model="s.cap_verify_url" placeholder="https://cap.example.com/site-key/siteverify"></div><div class="fi"><label>Cap Secret Key</label><input type="password" v-model="s.cap_secret_key"></div></div>
-        <div v-if="s.captcha_enabled" class="frow"><div class="fi"><label>失败几次后升级</label><input type="number" v-model.number="s.captcha_failure_threshold" min="1" max="20"></div><div class="fi"><label>风险窗口（秒）</label><input type="number" v-model.number="s.captcha_risk_window_seconds" min="60" max="86400"></div><div class="fi"><label>升级 Provider</label><select v-model="s.captcha_escalation_provider"><option value="turnstile">Cloudflare Turnstile</option></select></div></div>
+        <div v-if="s.captcha_enabled" class="frow"><div class="fi"><label>{{L('失败几次后升级','Escalate after failures')}}</label><input type="number" v-model.number="s.captcha_failure_threshold" min="1" max="20"></div><div class="fi"><label>{{L('风险窗口（秒）','Risk window (s)')}}</label><input type="number" v-model.number="s.captcha_risk_window_seconds" min="60" max="86400"></div><div class="fi"><label>{{L('升级 Provider','Escalation provider')}}</label><select v-model="s.captcha_escalation_provider"><option value="turnstile">Cloudflare Turnstile</option></select></div></div>
 
-        <div class="section">☁️ Cloudflare Turnstile（异常升级）</div>
-        <div class="frow"><div class="fi"><label>启用</label><select v-model="s.cf_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select><div class="hint">作为异常访问、Cap 多次失败后的严格验证。</div></div></div>
+        <div class="section">{{L('☁️ Cloudflare Turnstile（异常升级）','☁️ Cloudflare Turnstile (escalation)')}}</div>
+        <div class="frow"><div class="fi"><label>{{L('启用','Enable')}}</label><select v-model="s.cf_enabled"><option :value="false">{{L('关闭','Disable')}}</option><option :value="true">{{L('启用','Enable')}}</option></select><div class="hint">{{L('作为异常访问、Cap 多次失败后的严格验证。','Used as strict verification after suspicious activity or repeated Cap failures.')}}</div></div></div>
         <div v-if="s.cf_enabled" class="frow"><div class="fi"><label>Site Key</label><input v-model="s.cf_site_key" placeholder="0x..."></div><div class="fi"><label>Secret Key</label><input type="password" v-model="s.cf_secret_key"></div></div>
-        <div class="section">🎮 PlayCaptcha（实验性 UI）</div>
-        <div class="frow"><div class="fi"><label>启用实验字段</label><select v-model="s.playcaptcha_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select><div class="hint">不作为后端安全判断，只预留未来趣味交互。</div></div><div class="fi"><label>Endpoint</label><input v-model="s.playcaptcha_endpoint" placeholder="实验性"></div></div>
+        <div class="section">{{L('🎮 PlayCaptcha（实验性 UI）','🎮 PlayCaptcha (experimental UI)')}}</div>
+        <div class="frow"><div class="fi"><label>{{L('启用实验字段','Enable experimental fields')}}</label><select v-model="s.playcaptcha_enabled"><option :value="false">{{L('关闭','Disable')}}</option><option :value="true">{{L('启用','Enable')}}</option></select><div class="hint">{{L('不作为后端安全判断，只预留未来趣味交互。','Not trusted for security; reserved for future playful interactions.')}}</div></div><div class="fi"><label>Endpoint</label><input v-model="s.playcaptcha_endpoint" placeholder="Experimental"></div></div>
 
-        <div class="section">🔔 通知渠道</div>
-        <div class="notice-matrix"><div><b>通知矩阵</b><span>启用的渠道会并发发送；单个渠道超时或失败不会阻塞其它渠道。缺少必填字段的渠道会被自动跳过并写入服务日志。</span></div><i>8s timeout</i></div>
+        <div class="section">{{L('🔔 通知渠道','🔔 Notifications')}}</div>
+        <div class="notice-matrix"><div><b>{{L('通知矩阵','Notification matrix')}}</b><span>{{L('启用的渠道会并发发送；单个渠道超时或失败不会阻塞其它渠道。缺少必填字段的渠道会被自动跳过并写入服务日志。','Enabled channels send in parallel; one channel timing out or failing does not block the others. Missing required fields are skipped and logged.')}}</span></div><i>8s timeout</i></div>
         <div class="frow"><div class="fi"><label>飞书</label><select v-model="s.feishu"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
         <div v-if="s.feishu" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.feishu_webhook"></div><div class="fi"><label>签名 Secret</label><input v-model="s.feishu_secret"></div></div>
         <div class="frow"><div class="fi"><label>Telegram</label><select v-model="s.telegram"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
@@ -619,11 +652,11 @@ createApp({
         <div class="frow"><div class="fi"><label>通用 Webhook</label><select v-model="s.webhook"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
         <div v-if="s.webhook" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.webhook_url"></div><div class="fi"><label>Secret Header</label><input v-model="s.webhook_secret"></div></div>
 
-        <div class="section">🤖 AI 审核（OpenAI Moderation）</div>
+        <div class="section">{{L('🤖 AI 审核（OpenAI Moderation）','🤖 AI review (OpenAI Moderation)')}}</div>
         <div class="frow"><div class="fi"><label>启用</label><select v-model="s.mod_enabled"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
         <div v-if="s.mod_enabled" class="frow"><div class="fi"><label>OpenAI API Key</label><input type="password" v-model="s.mod_openai_key" placeholder="sk-..."></div><div class="fi"><label>高置信自动删除</label><select v-model="s.mod_auto_delete"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
 
-        <div class="section">🤖 举报自动化 Bot</div>
+        <div class="section">{{L('🤖 举报自动化 Bot','🤖 Report automation bot')}}</div>
         <div class="frow">
           <div class="fi"><label>Bot 模式</label><select v-model="s.bot_mode"><option value="off">关闭（手动审核）</option><option value="approve_all">全部自动通过</option><option value="reject_all">全部自动驳回</option><option value="smart">智能判断（推荐）</option></select></div>
         </div>
@@ -637,10 +670,10 @@ createApp({
           <div class="fi"><label>每日举报上限/IP</label><input type="number" v-model.number="s.report_daily_limit" min="1" max="200"></div>
         </div>
 
-        <div class="section">🖼️ 用户页背景</div>
-        <div class="frow"><div class="fi"><label>背景图片/视频 URL</label><input v-model="s.bg_url" placeholder="留空使用默认渐变背景"></div><div class="fi"><label>类型</label><select v-model="s.bg_type"><option value="image">图片</option><option value="video">视频</option></select></div></div>
+        <div class="section">{{L('🖼️ 用户页背景','🖼️ Public page background')}}</div>
+        <div class="frow"><div class="fi"><label>{{L('背景图片/视频 URL','Background image/video URL')}}</label><input v-model="s.bg_url" :placeholder="L('留空使用默认渐变背景','Leave blank for default gradient background')"></div><div class="fi"><label>{{L('类型','Type')}}</label><select v-model="s.bg_type"><option value="image">{{L('图片','Image')}}</option><option value="video">{{L('视频','Video')}}</option></select></div></div>
 
-        <div style="margin-top:36px;padding-top:24px;border-top:1px solid var(--border)"><button class="btn1" style="padding:14px 48px;font-size:15px" @click="doSave">💾 保存全部设置</button></div>
+        <div style="margin-top:36px;padding-top:24px;border-top:1px solid var(--border)"><button class="btn1" style="padding:14px 48px;font-size:15px" @click="doSave">💾 {{L('保存全部设置','Save all settings')}}</button></div>
       </div>
     </div>
   </div>`

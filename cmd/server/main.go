@@ -186,6 +186,9 @@ func main() {
 				ModEnabled                bool   `json:"mod_enabled"`
 				ModOpenAIKey              string `json:"mod_openai_key"`
 				ModAutoDel                bool   `json:"mod_auto_delete"`
+				ReportDailyLimit          int    `json:"report_daily_limit"`
+				ReportMinInterval         int    `json:"report_min_interval"`
+				ReportAutoBan             int    `json:"report_auto_ban"`
 			}
 			if err := json.Unmarshal([]byte(plain), &boot); err == nil {
 				if boot.Version != "" {
@@ -248,6 +251,7 @@ func main() {
 					captchaCfg.Cap.APIEndpoint = boot.CapAPIEndpoint
 				}
 				captchaSvc.ReloadConfig(captchaCfg)
+				reportSvc.ReloadConfig(service.ReportConfig{DailyLimit: boot.ReportDailyLimit, MinInterval: boot.ReportMinInterval, AutoBanAfter: boot.ReportAutoBan})
 				modSvc.ReloadConfig(&service.ModerationConfig{
 					Enabled: boot.ModEnabled, OpenAIKey: boot.ModOpenAIKey, AutoDelete: boot.ModAutoDel,
 				})

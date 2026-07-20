@@ -941,6 +941,21 @@ func (h *AdminHandler) reloadRateLimit(settingsJSON string) {
 	middleware.SetRateLimitWhitelist(s.RateWhitelist)
 }
 
+func (h *AdminHandler) reloadReportConfig(settingsJSON string) {
+	if h.reportSvc == nil {
+		return
+	}
+	var s struct {
+		DailyLimit   int `json:"report_daily_limit"`
+		MinInterval  int `json:"report_min_interval"`
+		AutoBanAfter int `json:"report_auto_ban"`
+	}
+	if err := json.Unmarshal([]byte(settingsJSON), &s); err != nil {
+		return
+	}
+	h.reportSvc.ReloadConfig(service.ReportConfig{DailyLimit: s.DailyLimit, MinInterval: s.MinInterval, AutoBanAfter: s.AutoBanAfter})
+}
+
 func (h *AdminHandler) reloadTurnstile(settingsJSON string) {
 	var s struct {
 		CFEnabled bool   `json:"cf_enabled"`
