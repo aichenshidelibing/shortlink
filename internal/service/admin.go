@@ -348,11 +348,8 @@ func (s *AdminService) GetOrCreateSuffix(ctx context.Context) (string, error) {
 		return settings.Suffix, nil
 	}
 
-	// Default suffix = admin username on first init
-	suffix := s.cfg.Username
-	if suffix == "" {
-		suffix = "admin"
-	}
+	// Default suffix = random on first init to avoid obvious admin paths.
+	suffix := s.GenerateSuffix(8)
 	suffix, err = s.ensureSuffixSafe(ctx, suffix, settings.ShortlinkLength)
 	if err != nil {
 		return "", err

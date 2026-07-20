@@ -40,6 +40,26 @@
 
 ---
 
+## 从 GitHub 拉取项目
+
+原始仓库地址：
+
+```bash
+git clone https://github.com/aichenshidelibing/shortlink.git
+```
+
+加速站地址（使用 gh-proxy）：
+
+```bash
+git clone https://gh-proxy.com/https://github.com/aichenshidelibing/shortlink.git
+```
+
+如果你已经克隆过仓库，也可以直接更新：
+
+```bash
+git pull origin main
+```
+
 ## 部署指南
 
 ### 前置条件

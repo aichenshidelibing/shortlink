@@ -670,7 +670,7 @@ PY
     echo -e "${GREEN}========================================${NC}"
     echo ""
     echo -e "📌 访问地址: ${BLUE}http://127.0.0.1:${PORT}${NC}"
-    echo -e "📌 管理后台: ${BLUE}查看 docker compose logs app 中的 Admin suffix，然后访问 http://127.0.0.1:${PORT}/{suffix}/${NC}"
+    echo -e "📌 管理后台: ${BLUE}后台入口已随机生成，请查看应用日志或通知渠道获取${NC}"
     echo -e "📌 已绑定回环 (127.0.0.1) — 外网访问请自行配置 Nginx 反代到 ${BLUE}127.0.0.1:${PORT}${NC}"
     echo -e "📌 Cap 控制台: ${BLUE}http://127.0.0.1:${CAP_HTTP_PORT}${NC}（本机随机端口，不暴露公网）"
     echo -e "📌 Cap 公网页面/组件统一走 Shortlink 同域反代: ${BLUE}/cap/${NC}；反代公网时只需要把域名指向 Shortlink 主服务。"
