@@ -2,7 +2,9 @@ package auth
 
 import (
 	"bytes"
+	"encoding/base32"
 	"image/png"
+	"strings"
 	"time"
 
 	"github.com/pquerna/otp/totp"
@@ -51,13 +53,17 @@ func (t *TOTP) Validate(passcode, secret string) bool {
 }
 
 func (t *TOTP) ProvisioningURI(account, secret string) string {
-	key, _ := totp.Generate(totp.GenerateOpts{
+	secretBytes, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(strings.TrimSpace(secret)))
+	if err != nil {
+		return ""
+	}
+	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "Shortlink",
 		AccountName: account,
-		Secret:      []byte(secret),
+		Secret:      secretBytes,
 	})
-	if key != nil {
-		return key.URL()
+	if err != nil || key == nil {
+		return ""
 	}
-	return ""
+	return key.URL()
 }

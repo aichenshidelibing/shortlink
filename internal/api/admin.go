@@ -425,8 +425,7 @@ func (h *AdminHandler) settingsWithRuntimeDefaults(settingsJSON string) string {
 	if raw == nil {
 		raw = make(map[string]interface{})
 	}
-	if h != nil && h.captchaSvc != nil {
-		cfg := h.captchaSvc.Config()
+	if h != nil {
 		setDefault := func(key string, value interface{}) {
 			if _, ok := raw[key]; !ok {
 				raw[key] = value
@@ -440,17 +439,49 @@ func (h *AdminHandler) settingsWithRuntimeDefaults(settingsJSON string) string {
 				raw[key] = value
 			}
 		}
-		setDefault("captcha_enabled", cfg.Enabled)
-		setDefault("captcha_provider", cfg.Provider)
-		setDefault("captcha_mode", cfg.Mode)
-		setDefault("captcha_normal_provider", cfg.NormalProvider)
-		setDefault("captcha_escalation_provider", cfg.EscalationProvider)
-		setDefault("captcha_failure_threshold", cfg.FailureThreshold)
-		setDefault("captcha_risk_window_seconds", cfg.RiskWindowSeconds)
-		setRuntimeString("cap_site_key", cfg.Cap.SiteKey)
-		setRuntimeString("cap_api_endpoint", cfg.Cap.APIEndpoint)
-		setRuntimeString("cap_verify_url", cfg.Cap.VerifyURL)
-		setRuntimeString("cap_secret_key", cfg.Cap.SecretKey)
+		if h.captchaSvc != nil {
+			cfg := h.captchaSvc.Config()
+			setDefault("captcha_enabled", cfg.Enabled)
+			setDefault("captcha_provider", cfg.Provider)
+			setDefault("captcha_mode", cfg.Mode)
+			setDefault("captcha_normal_provider", cfg.NormalProvider)
+			setDefault("captcha_escalation_provider", cfg.EscalationProvider)
+			setDefault("captcha_failure_threshold", cfg.FailureThreshold)
+			setDefault("captcha_risk_window_seconds", cfg.RiskWindowSeconds)
+			setRuntimeString("cap_site_key", cfg.Cap.SiteKey)
+			setRuntimeString("cap_api_endpoint", cfg.Cap.APIEndpoint)
+			setRuntimeString("cap_verify_url", cfg.Cap.VerifyURL)
+			setRuntimeString("cap_secret_key", cfg.Cap.SecretKey)
+		}
+		if h.noticeSvc != nil {
+			cfg := h.noticeSvc.Config()
+			setDefault("feishu", cfg.Feishu.Enabled)
+			setDefault("feishu_webhook", cfg.Feishu.Webhook)
+			setDefault("feishu_secret", cfg.Feishu.Secret)
+			setDefault("telegram", cfg.Telegram.Enabled)
+			setDefault("tg_token", cfg.Telegram.BotToken)
+			setDefault("tg_chat", cfg.Telegram.ChatID)
+			setDefault("dingtalk", cfg.Dingtalk.Enabled)
+			setDefault("ding_webhook", cfg.Dingtalk.Webhook)
+			setDefault("ding_secret", cfg.Dingtalk.Secret)
+			setDefault("wecom", cfg.WeCom.Enabled)
+			setDefault("wecom_webhook", cfg.WeCom.Webhook)
+			setDefault("bark", cfg.Bark.Enabled)
+			setDefault("bark_key", cfg.Bark.Key)
+			setDefault("bark_endpoint", cfg.Bark.Endpoint)
+			setDefault("discord", cfg.Discord.Enabled)
+			setDefault("discord_webhook", cfg.Discord.Webhook)
+			setDefault("email", cfg.Email.Enabled)
+			setDefault("email_host", cfg.Email.Host)
+			setDefault("email_port", cfg.Email.Port)
+			setDefault("email_user", cfg.Email.User)
+			setDefault("email_pass", cfg.Email.Pass)
+			setDefault("email_from", cfg.Email.From)
+			setDefault("email_to", cfg.Email.To)
+			setDefault("webhook", cfg.Webhook.Enabled)
+			setDefault("webhook_url", cfg.Webhook.URL)
+			setDefault("webhook_secret", cfg.Webhook.Secret)
+		}
 	}
 	buf, _ := json.Marshal(raw)
 	return string(buf)

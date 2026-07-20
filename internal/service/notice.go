@@ -8,6 +8,7 @@ import (
 	"shortlink/internal/notice"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -19,12 +20,26 @@ type NoticeService struct {
 	mu        sync.RWMutex
 	providers []notice.Notifier
 	log       *zap.Logger
+	baseCfg   atomic.Value // config.NotificationConfig
 }
 
 func NewNoticeService(cfg *config.NotificationConfig, log *zap.Logger) *NoticeService {
 	s := &NoticeService{log: log}
-	s.initFromConfig(cfg)
+	s.ReloadFromConfig(cfg)
 	return s
+}
+
+func (s *NoticeService) ReloadFromConfig(cfg *config.NotificationConfig) {
+	copy := normalizeNotificationConfig(cfg)
+	s.baseCfg.Store(&copy)
+	s.initFromConfig(&copy)
+}
+
+func (s *NoticeService) currentConfig() config.NotificationConfig {
+	if v := s.baseCfg.Load(); v != nil {
+		return *(v.(*config.NotificationConfig))
+	}
+	return normalizeNotificationConfig(nil)
 }
 
 func (s *NoticeService) initFromConfig(cfg *config.NotificationConfig) {
@@ -88,9 +103,35 @@ type noticeSettings struct {
 	WebhookSecret  string `json:"webhook_secret"`
 }
 
+func hasNoticeSettings(raw map[string]json.RawMessage) bool {
+	for _, key := range []string{
+		"feishu", "feishu_webhook", "feishu_secret",
+		"telegram", "tg_token", "tg_chat",
+		"dingtalk", "ding_webhook", "ding_secret",
+		"wecom", "wecom_webhook",
+		"bark", "bark_key", "bark_endpoint",
+		"discord", "discord_webhook",
+		"email", "email_host", "email_port", "email_user", "email_pass", "email_from", "email_to",
+		"webhook", "webhook_url", "webhook_secret",
+	} {
+		if _, ok := raw[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // ReloadFromJSON rebuilds notification providers from admin settings JSON.
 func (s *NoticeService) ReloadFromJSON(settingsJSON string) {
 	if settingsJSON == "" {
+		return
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(settingsJSON), &raw); err != nil {
+		s.warn("parse notice settings failed", zap.Error(err))
+		return
+	}
+	if !hasNoticeSettings(raw) {
 		return
 	}
 	var ns noticeSettings
@@ -105,6 +146,18 @@ func (s *NoticeService) ReloadFromJSON(settingsJSON string) {
 	s.mu.Unlock()
 
 	s.info("notice providers reloaded", zap.Int("count", len(providers)), zap.Strings("providers", providerNames(providers)))
+}
+
+func (s *NoticeService) Config() config.NotificationConfig {
+	return s.currentConfig()
+}
+
+func normalizeNotificationConfig(cfg *config.NotificationConfig) config.NotificationConfig {
+	var out config.NotificationConfig
+	if cfg != nil {
+		out = *cfg
+	}
+	return out
 }
 
 func (s *NoticeService) providersFromSettings(ns noticeSettings) []notice.Notifier {

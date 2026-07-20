@@ -255,6 +255,7 @@ func main() {
 				modSvc.ReloadConfig(&service.ModerationConfig{
 					Enabled: boot.ModEnabled, OpenAIKey: boot.ModOpenAIKey, AutoDelete: boot.ModAutoDel,
 				})
+				noticeSvc.ReloadFromConfig(&cfg.Notification)
 			}
 			noticeSvc.ReloadFromJSON(plain)
 		}
