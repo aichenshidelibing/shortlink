@@ -298,6 +298,67 @@ load_existing_env() {
     done < "$file"
 }
 
+compose_project_name() {
+    if [ -n "${COMPOSE_PROJECT_NAME:-}" ]; then
+        printf '%s' "$COMPOSE_PROJECT_NAME"
+    else
+        basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '_'
+    fi
+}
+
+mysql_data_volume_name() {
+    printf '%s_mysql-data' "$(compose_project_name)"
+}
+
+mysql_data_volume_exists() {
+    docker volume inspect "$(mysql_data_volume_name)" >/dev/null 2>&1
+}
+
+print_db_volume_password_help() {
+    local vol
+    vol="$(mysql_data_volume_name)"
+    echo -e "${RED}检测到已有 MySQL 数据卷: ${vol}${NC}"
+    echo -e "${YELLOW}MySQL 官方镜像只在首次初始化空数据卷时应用 MYSQL_USER / MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD。${NC}"
+    echo -e "${YELLOW}如果已有数据卷却重新生成数据库密码，应用会出现 Access denied for user。${NC}"
+    echo ""
+    echo "处理方式："
+    echo "  1) 保留数据：找回原来的 .env，并确保 DB_PASSWORD 和 DB_ROOT_PASSWORD 是旧数据卷初始化时的值。"
+    echo "  2) 不保留数据：执行 ${COMPOSE_CMD} down -v 删除旧数据卷后重新运行本脚本。"
+    echo "  3) 只重置数据库：docker volume rm ${vol} 后重新运行本脚本。"
+}
+
+require_db_passwords_for_existing_volume() {
+    mysql_data_volume_exists || return 0
+    if [ -z "${DB_PASSWORD:-}" ] || [ -z "${DB_ROOT_PASSWORD:-}" ]; then
+        print_db_volume_password_help
+        echo ""
+        echo -e "${RED}为避免生成新密码导致旧数据库无法登录，部署已停止。${NC}"
+        exit 1
+    fi
+}
+
+wait_for_app_ready() {
+    local logs
+    echo -e "${YELLOW}>>> 等待应用启动并检查数据库连接...${NC}"
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        if curl -fsS "http://127.0.0.1:${PORT}/api/config" >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ 应用已就绪${NC}"
+            return 0
+        fi
+        logs="$($COMPOSE_CMD logs --no-color --tail=80 app 2>/dev/null || true)"
+        if printf '%s' "$logs" | grep -q 'Access denied for user'; then
+            print_db_volume_password_help
+            echo ""
+            echo -e "${RED}应用连接数据库失败：当前 .env 中的数据库账号/密码与已有 MySQL 数据卷不匹配。${NC}"
+            exit 1
+        fi
+        sleep 2
+    done
+    echo -e "${RED}应用未在预期时间内就绪，最近日志如下：${NC}"
+    $COMPOSE_CMD logs --no-color --tail=120 app 2>/dev/null || true
+    exit 1
+}
+
 verify_code() {
     local sender_desc="$1" code="$2" input
     echo -e "${BLUE}已发送测试消息到 ${sender_desc}${NC}"
@@ -489,6 +550,7 @@ main() {
     DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-$(genkey)}"
     REDIS_PASSWORD="${REDIS_PASSWORD:-$(genkey)}"
     CAP_ADMIN_KEY="${CAP_ADMIN_KEY:-$(genkey)}"
+    require_db_passwords_for_existing_volume
     echo -e "${GREEN}✓ 密钥已就绪${NC}"
     echo ""
 
@@ -623,6 +685,7 @@ ENDCFG
     echo -e "${YELLOW}>>> 构建并启动...${NC}"
     $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
     $COMPOSE_CMD up --build -d
+    wait_for_app_ready
 
     if ! cap_key_ready; then
         [ -n "${CAP_SITE_KEY:-}" ] && echo -e "${YELLOW}⚠ 既有 Cap Site Key 不可用，正在重新创建...${NC}"
