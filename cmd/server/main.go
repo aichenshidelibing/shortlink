@@ -131,6 +131,7 @@ func main() {
 	linkRepo := repository.NewLinkRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
 	apiKeyRepo := repository.NewAPIKeyRepository(db)
+	statusRepo := repository.NewStatusRepository(db)
 	clickRepo := repository.NewClickRepository(db)
 	banRepo := repository.NewBanRepository(db)
 	wordRepo := repository.NewWordRepository(db)
@@ -142,7 +143,8 @@ func main() {
 
 	adminSvc := service.NewAdminService(&cfg.Admin, adminRepo, auth.NewTOTP(), auth.NewSessionManager(cfg.Admin.SessionSecret), cryptoMgr, db, rdb, log)
 	linkSvc := service.NewLinkService(&cfg.Shortlink, linkRepo, cacheRepo, adminRepo, strong, log)
-	apiKeySvc := service.NewAPIKeyService(apiKeyRepo, log, cacheRepo)
+	apiKeySvc := service.NewAPIKeyService(apiKeyRepo, log, cryptoMgr, cacheRepo)
+	statusSvc := service.NewStatusService(statusRepo, adminSvc, log)
 	statsSvc := service.NewStatsService(clickRepo, linkRepo, log)
 	banSvc := service.NewBanService(banRepo, strong, log)
 	auditSvc := service.NewAuditService(auditRepo, log)
@@ -280,6 +282,8 @@ func main() {
 	appCtx, cancelApp := context.WithCancel(context.Background())
 	defer cancelApp()
 
+	statusSvc.Start(appCtx, time.Minute)
+
 	clickWorker := worker.NewClickWorker(clickRepo, log)
 	clickWorker.Start(appCtx)
 
@@ -331,7 +335,7 @@ func main() {
 	r.Use(middleware.BanCheck(banSvc))
 	r.Use(middleware.RateLimit(cacheRepo, &cfg.RateLimit))
 
-	publicHandler := api.NewPublicHandler(linkSvc, apiKeySvc, wordFilterSvc, banSvc, adminSvc, reportSvc, modSvc, safeScanner, cfg)
+	publicHandler := api.NewPublicHandler(linkSvc, apiKeySvc, wordFilterSvc, banSvc, adminSvc, reportSvc, modSvc, safeScanner, statusSvc, cfg)
 	redirectHandler := api.NewRedirectHandler(linkSvc, linkRepo, clickRepo, clickWorker, strong, statsSvc)
 	adminHandler := api.NewAdminHandler(adminSvc, linkSvc, apiKeySvc, statsSvc, banSvc, wordFilterSvc, noticeSvc, reportSvc, modSvc, auditSvc, domainSvc, captchaSvc, auth.NewSessionManager(cfg.Admin.SessionSecret))
 
@@ -383,6 +387,7 @@ func main() {
 		// TOTP QR / verify were previously public — but that leaked the
 		// otpauth URI (including secret) to anyone who knew the suffix,
 		// and let unauthenticated callers flip TOTPVerified. Moved to authd.
+		adminGroup.GET("/api/login-state", adminHandler.LoginState)
 		adminGroup.POST("/api/login", middleware.CaptchaGuard(captchaSvc, &cfg.Cloudflare, service.CaptchaActionAdminLogin), adminHandler.Login)
 		adminGroup.POST("/api/logout", adminHandler.Logout)
 		adminGroup.GET("/api/version", adminHandler.GetVersion)
@@ -397,6 +402,7 @@ func main() {
 			authd.DELETE("/links/:code", adminHandler.DeleteLink)
 			authd.GET("/apikeys", adminHandler.ListAPIKeys)
 			authd.POST("/apikeys", adminHandler.CreateAPIKey)
+			authd.POST("/apikeys/:id/reveal", adminHandler.RevealAPIKey)
 			authd.PATCH("/apikeys/:id", adminHandler.UpdateAPIKey)
 			authd.POST("/apikeys/:id/revoke", adminHandler.RevokeAPIKey)
 			authd.DELETE("/apikeys/:id", adminHandler.DeleteAPIKey)
@@ -441,19 +447,23 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func(ctx context.Context) {
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
+		runRotation := func(now time.Time) {
+			if suffix, rotated, err := adminSvc.RotateSuffixIfDue(ctx, now); err != nil {
+				log.Warn("rotate admin suffix failed", zap.Error(err))
+			} else if rotated {
+				noticeSvc.SendSuffixChanged(ctx, suffix, "")
+				log.Info("scheduled admin suffix rotated", zap.String("suffix", suffix))
+			}
+		}
+
+		runRotation(time.Now())
+		timer := time.NewTimer(time.Until(service.NextLocalNoonAfter(time.Now())))
+		defer timer.Stop()
 		for {
 			select {
-			case <-ticker.C:
-				if _, err := adminSvc.RotateSuffix(context.Background()); err == nil {
-					newSuffix, _ := adminSvc.GetSettings(context.Background())
-					if newSuffix != nil {
-						noticeSvc.SendSuffixChanged(context.Background(), newSuffix.Suffix, "")
-					}
-				} else {
-					log.Warn("rotate admin suffix failed", zap.Error(err))
-				}
+			case <-timer.C:
+				runRotation(time.Now())
+				timer.Reset(time.Until(service.NextLocalNoonAfter(time.Now())))
 			case <-ctx.Done():
 				return
 			}

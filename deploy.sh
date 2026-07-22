@@ -5,6 +5,10 @@ umask 077
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+ENV_FILE="${SHORTLINK_ENV_FILE:-.env}"
+CONFIG_FILE="${SHORTLINK_CONFIG_FILE:-configs/config.yaml}"
+SKIP_IMAGE_PULLS="${SHORTLINK_SKIP_IMAGE_PULLS:-false}"
+SKIP_DOCKER_MIRROR="${SHORTLINK_SKIP_DOCKER_MIRROR:-false}"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}   Shortlink 一键部署脚本${NC}"
@@ -274,6 +278,10 @@ yaml_quote() {
 write_env_var() { printf '%s=%s\n' "$1" "$(dotenv_quote "$2")"; }
 write_env_raw() { printf '%s=%s\n' "$1" "$2"; }
 
+compose() {
+    $COMPOSE_CMD --env-file "$ENV_FILE" "$@"
+}
+
 load_existing_env() {
     local file="$1" line key val
     [ -f "$file" ] || return 0
@@ -345,7 +353,7 @@ wait_for_app_ready() {
             echo -e "${GREEN}✓ 应用已就绪${NC}"
             return 0
         fi
-        logs="$($COMPOSE_CMD logs --no-color --tail=80 app 2>/dev/null || true)"
+        logs="$(compose logs --no-color --tail=80 app 2>/dev/null || true)"
         if printf '%s' "$logs" | grep -q 'Access denied for user'; then
             print_db_volume_password_help
             echo ""
@@ -355,7 +363,7 @@ wait_for_app_ready() {
         sleep 2
     done
     echo -e "${RED}应用未在预期时间内就绪，最近日志如下：${NC}"
-    $COMPOSE_CMD logs --no-color --tail=120 app 2>/dev/null || true
+    compose logs --no-color --tail=120 app 2>/dev/null || true
     exit 1
 }
 
@@ -403,7 +411,7 @@ cap_key_ready() {
 
 get_current_admin_suffix() {
     local line
-    line=$( ($COMPOSE_CMD logs --no-color app 2>/dev/null || true) | grep '"msg":"Admin suffix"' | tail -n1 || true )
+    line=$( (compose logs --no-color app 2>/dev/null || true) | grep '"msg":"Admin suffix"' | tail -n1 || true )
     [ -n "$line" ] || return 1
     printf '%s' "$line" | python3 -c 'import json,sys
 line=sys.stdin.read().strip()
@@ -531,17 +539,25 @@ main() {
     echo -e "${GREEN}Docker: $(docker --version)${NC}"
     echo ""
 
-    configure_mirror
-    pull_images
-    for img in "tiago2/cap:latest" "valkey/valkey:9-alpine"; do
-        pull_retry "$img" || echo -e "${YELLOW}${img} 拉取失败，启动时会自动重试${NC}"
-    done
+    if [ "$SKIP_DOCKER_MIRROR" = "true" ]; then
+        echo -e "${YELLOW}>>> 已跳过 Docker 镜像加速配置${NC}"
+    else
+        configure_mirror
+    fi
+    if [ "$SKIP_IMAGE_PULLS" = "true" ]; then
+        echo -e "${YELLOW}>>> 已跳过预拉取镜像${NC}"
+    else
+        pull_images
+        for img in "tiago2/cap:latest" "valkey/valkey:9-alpine"; do
+            pull_retry "$img" || echo -e "${YELLOW}${img} 拉取失败，启动时会自动重试${NC}"
+        done
+    fi
     echo ""
 
     echo -e "${YELLOW}>>> 生成安全密钥...${NC}"
-    if [ -f .env ]; then
-        echo -e "${BLUE}   检测到既有 .env — 安全解析并复用其中的密钥/密码（如需重置请先 ${COMPOSE_CMD} down -v）${NC}"
-        load_existing_env .env
+    if [ -f "$ENV_FILE" ]; then
+        echo -e "${BLUE}   检测到既有 ${ENV_FILE} — 安全解析并复用其中的密钥/密码（如需重置请先 ${COMPOSE_CMD} down -v）${NC}"
+        load_existing_env "$ENV_FILE"
     fi
     ENCRYPTION_KEY="${ENCRYPTION_KEY:-$(genkey)}"
     SESSION_SECRET="${ADMIN_SESSION_SECRET:-$(genkey)}"
@@ -582,7 +598,7 @@ main() {
     CAP_VERIFY_URL="${CAP_VERIFY_URL:-http://cap:3000/${CAP_SITE_KEY:-}/siteverify}"
     configure_notifications
 
-    echo -e "${YELLOW}>>> 写入 .env ...${NC}"
+    echo -e "${YELLOW}>>> 写入 ${ENV_FILE} ...${NC}"
     {
         echo "# Shortlink — $(date '+%Y-%m-%d %H:%M:%S')"
         write_env_var ADMIN_USERNAME admin
@@ -644,10 +660,11 @@ main() {
         write_env_raw WEBHOOK_ENABLED "$WEBHOOK_ENABLED"
         write_env_var WEBHOOK_URL "${WEBHOOK_URL:-}"
         write_env_var WEBHOOK_SECRET "${WEBHOOK_SECRET:-}"
-    } > .env
-    echo -e "${GREEN}✓ .env 已生成 (绑定 127.0.0.1:${PORT})${NC}"
+    } > "$ENV_FILE"
+    echo -e "${GREEN}✓ ${ENV_FILE} 已生成 (绑定 127.0.0.1:${PORT})${NC}"
 
-    cat > configs/config.yaml << ENDCFG
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+    cat > "$CONFIG_FILE" << ENDCFG
 server: {port: ${PORT}, mode: release, trusted_proxy: true}
 database: {driver: mysql, host: mysql, port: 3306, user: $(yaml_quote "$DB_USER"), password: $(yaml_quote "$DB_PASSWORD"), dbname: $(yaml_quote "$DB_NAME"), charset: utf8mb4, max_open: 50, max_idle: 10}
 redis: {addr: redis:6379, password: $(yaml_quote "$REDIS_PASSWORD"), db: 0}
@@ -678,13 +695,13 @@ notification:
 features: {allow_custom_code: true, require_privacy_agree: true}
 background: {enabled: false, url: "", type: image}
 ENDCFG
-    chmod 600 .env configs/config.yaml 2>/dev/null || true
-    echo -e "${GREEN}✓ config.yaml 已生成${NC}"
+    chmod 600 "$ENV_FILE" "$CONFIG_FILE" 2>/dev/null || true
+    echo -e "${GREEN}✓ ${CONFIG_FILE} 已生成${NC}"
 
     echo ""
     echo -e "${YELLOW}>>> 构建并启动...${NC}"
-    $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
-    $COMPOSE_CMD up --build -d
+    compose down --remove-orphans 2>/dev/null || true
+    compose up --build -d
     wait_for_app_ready
 
     if ! cap_key_ready; then
@@ -703,7 +720,7 @@ from pathlib import Path
 def dotenv_quote(v):
     return '"' + v.replace('\\', '\\\\').replace('"', '\\"').replace('$', '\\$').replace('`', '\\`').replace('\n', '\\n') + '"'
 
-p = Path('.env')
+p = Path(os.environ.get('SHORTLINK_ENV_FILE') or '.env')
 s = p.read_text()
 repls = {
     'CAP_SITE_KEY': os.environ['CAP_SITE_KEY'],
@@ -727,7 +744,7 @@ for k, v in repls.items():
     s = '\n'.join(out) + '\n'
 p.write_text(s)
 
-c = Path('configs/config.yaml')
+c = Path(os.environ.get('SHORTLINK_CONFIG_FILE') or 'configs/config.yaml')
 y = c.read_text()
 lines = []
 for line in y.splitlines():
@@ -738,7 +755,7 @@ for line in y.splitlines():
     lines.append(line)
 c.write_text('\n'.join(lines) + '\n')
 PY
-        $COMPOSE_CMD up -d app
+        SHORTLINK_ENV_FILE="$ENV_FILE" SHORTLINK_CONFIG_FILE="$CONFIG_FILE" compose up -d app
     fi
 
     ADMIN_SUFFIX="$(get_current_admin_suffix || true)"

@@ -51,6 +51,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.AdminSetting{},
 		&model.Link{},
 		&model.APIKey{},
+		&model.AvailabilitySample{},
 		&model.Click{},
 		&model.BannedIP{},
 		&model.WordRule{},

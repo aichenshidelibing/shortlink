@@ -19,7 +19,34 @@ import (
 	"gorm.io/gorm"
 )
 
-const maxAdminSuffixLength = 32
+const (
+	maxAdminSuffixLength        = 32
+	scheduledSuffixRotationHour = 12
+)
+
+func localNoon(t time.Time) time.Time {
+	y, m, d := t.Date()
+	return time.Date(y, m, d, scheduledSuffixRotationHour, 0, 0, 0, t.Location())
+}
+
+func NextLocalNoonAfter(t time.Time) time.Time {
+	noon := localNoon(t)
+	if !t.Before(noon) {
+		return noon.AddDate(0, 0, 1)
+	}
+	return noon
+}
+
+func suffixRotationDue(changedAt, now time.Time) bool {
+	lastNoon := localNoon(now)
+	if now.Before(lastNoon) {
+		lastNoon = lastNoon.AddDate(0, 0, -1)
+	}
+	if changedAt.IsZero() {
+		return !now.Before(lastNoon)
+	}
+	return changedAt.Before(lastNoon)
+}
 
 type AdminService struct {
 	cfg     *config.AdminConfig
@@ -383,6 +410,29 @@ func (s *AdminService) RotateSuffix(ctx context.Context) (string, error) {
 	}
 	s.notifySuffix(suffix)
 	return suffix, nil
+}
+
+func (s *AdminService) RotateSuffixIfDue(ctx context.Context, now time.Time) (string, bool, error) {
+	settings, err := s.repo.GetSettings(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	if !suffixRotationDue(settings.SuffixChangedAt, now) {
+		return settings.Suffix, false, nil
+	}
+	suffix, err := s.RotateSuffix(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	return suffix, true, nil
+}
+
+func (s *AdminService) LoginTOTPRequired(ctx context.Context) (bool, error) {
+	admin, err := s.repo.Get(ctx)
+	if err != nil {
+		return false, err
+	}
+	return admin.TOTPVerified && admin.TOTPSecret != "", nil
 }
 
 func (s *AdminService) GetSettings(ctx context.Context) (*model.AdminSetting, error) {

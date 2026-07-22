@@ -64,9 +64,14 @@ func TestAdminHTMLDoesNotUseSelectClassOnTOTPInput(t *testing.T) {
 	if !strings.Contains(html, "ttl_options_selected") || !strings.Contains(html, "ttlSummary") {
 		t.Fatal("admin html missing friendly TTL controls")
 	}
-	for _, check := range []string{"captcha_enabled", "cap_verify_url", "playcaptcha_enabled"} {
+	for _, check := range []string{"captcha_enabled", "cap_verify_url", "playcaptcha_enabled", "loginTotpRequired", "handleAdminCaptchaError", "adminCaptchaProvider==='cap'", "adminCaptchaProvider==='turnstile'", "openKeyModal", "submitKey", "revealKey", "copyKey"} {
 		if !strings.Contains(html, check) {
 			t.Fatalf("admin html missing %q", check)
+		}
+	}
+	for _, old := range []string{"可选 · 6位数字", "Optional · 6 digits", "cfLoginEnabled", "captchaLoginEnabled", "prompt('Key 名称'"} {
+		if strings.Contains(html, old) {
+			t.Fatalf("admin html still contains old login UX marker %q", old)
 		}
 	}
 }

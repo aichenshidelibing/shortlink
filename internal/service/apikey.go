@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"shortlink/internal/auth"
+	"shortlink/internal/crypto"
 	"shortlink/internal/model"
 	"shortlink/internal/repository"
 	"time"
@@ -13,13 +16,14 @@ import (
 )
 
 type APIKeyService struct {
-	repo  *repository.APIKeyRepository
-	cache *repository.CacheRepository
-	log   *zap.Logger
+	repo   *repository.APIKeyRepository
+	cache  *repository.CacheRepository
+	log    *zap.Logger
+	crypto *crypto.CryptoManager
 }
 
-func NewAPIKeyService(repo *repository.APIKeyRepository, log *zap.Logger, cache ...*repository.CacheRepository) *APIKeyService {
-	s := &APIKeyService{repo: repo, log: log}
+func NewAPIKeyService(repo *repository.APIKeyRepository, log *zap.Logger, cryptoMgr *crypto.CryptoManager, cache ...*repository.CacheRepository) *APIKeyService {
+	s := &APIKeyService{repo: repo, log: log, crypto: cryptoMgr}
 	if len(cache) > 0 {
 		s.cache = cache[0]
 	}
@@ -51,8 +55,16 @@ func (s *APIKeyService) CreateWithOptions(ctx context.Context, opts APIKeyOption
 	}
 	buf, _ := json.Marshal(perms)
 
+	keyEnc := ""
+	if s.crypto != nil {
+		keyEnc = s.crypto.Encrypt(plainKey)
+	}
+
 	key := &model.APIKey{
 		KeyHash:         hash,
+		KeyEnc:          keyEnc,
+		KeyFingerprint:  apiKeyFingerprint(plainKey),
+		KeyPrefix:       apiKeyPrefix(plainKey),
 		Name:            opts.Name,
 		Purpose:         opts.Purpose,
 		PermissionsJSON: string(buf),
@@ -68,6 +80,18 @@ func (s *APIKeyService) CreateWithOptions(ctx context.Context, opts APIKeyOption
 	}
 
 	return plainKey, key, nil
+}
+
+func apiKeyFingerprint(plain string) string {
+	sum := sha256.Sum256([]byte(plain))
+	return hex.EncodeToString(sum[:])[:12]
+}
+
+func apiKeyPrefix(plain string) string {
+	if len(plain) <= 10 {
+		return plain
+	}
+	return plain[:10]
 }
 
 func (s *APIKeyService) Validate(ctx context.Context, plainKey string) (*model.APIKey, error) {
@@ -172,6 +196,30 @@ func (s *APIKeyService) GetByID(ctx context.Context, id uint64) (*model.APIKey, 
 
 func (s *APIKeyService) List(ctx context.Context) ([]model.APIKey, error) {
 	return s.repo.List(ctx)
+}
+
+func (s *APIKeyService) Reveal(ctx context.Context, id uint64) (string, *model.APIKey, error) {
+	key, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return "", nil, fmt.Errorf("api key not found")
+	}
+	if key.Revoked {
+		return "", nil, fmt.Errorf("api key revoked")
+	}
+	if key.KeyEnc == "" {
+		return "", nil, fmt.Errorf("legacy api key cannot be revealed; regenerate it to enable viewing")
+	}
+	if s.crypto == nil {
+		return "", nil, fmt.Errorf("api key reveal is unavailable")
+	}
+	plain, err := s.crypto.Decrypt(key.KeyEnc)
+	if err != nil || plain == "" {
+		return "", nil, fmt.Errorf("api key reveal failed")
+	}
+	if auth.HashAPIKey(plain) != key.KeyHash {
+		return "", nil, fmt.Errorf("api key integrity check failed")
+	}
+	return plain, key, nil
 }
 
 func (s *APIKeyService) Update(ctx context.Context, id uint64, opts APIKeyOptions) error {

@@ -40,7 +40,7 @@ async function api(path, opts = {}) {
   const h = {}; if (opts.body && typeof opts.body === 'string') h['Content-Type'] = 'application/json';
   const r = await fetch(path, { ...opts, headers: h });
   const j = await r.json();
-  if (!r.ok) throw new Error(j.error || 'request failed');
+  if (!r.ok) { const err = new Error(j.error || 'request failed'); err.data = j; throw err; }
   return j.data || j;
 }
 
@@ -52,7 +52,7 @@ function applyTheme(mode){const m=mode==='system'?(matchMedia('(prefers-color-sc
 function applyLang(lang){localStorage.setItem('sl_admin_lang',lang);document.documentElement.lang=lang==='en'?'en':'zh-CN'}
 function setFavicon(url){if(!url)return;let l=document.querySelector('link[rel="icon"]');if(!l){l=document.createElement('link');l.rel='icon';document.head.appendChild(l)}l.href=url}
 
-let adminCFKey='', adminCFRendered=false, adminCaptchaCfg={enabled:false,capEndpoint:''}, adminCapToken='',adminTurnstileLoading=false;
+let adminCFKey='', adminCFRendered=false, adminCaptchaCfg={enabled:false,normalProvider:'cap',capEndpoint:''}, adminCapToken='',adminTurnstileLoading=false;
 window.CAP_CUSTOM_WASM_URL='/cap/assets/cap_wasm_bg.wasm';window.CAP_DISABLE_WIDGET_REF=true;
 function onAdminTurnstileReady(){renderAdminTurnstile()}
 function ensureAdminTurnstileScript(){if(!adminCFKey||document.getElementById('admin-turnstile-script')||adminTurnstileLoading)return;adminTurnstileLoading=true;const s=document.createElement('script');s.id='admin-turnstile-script';s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onAdminTurnstileReady';s.async=true;s.defer=true;s.onload=()=>{adminTurnstileLoading=false;renderAdminTurnstile()};s.onerror=()=>{adminTurnstileLoading=false};document.head.appendChild(s)}
@@ -62,15 +62,21 @@ function adminCapI18n(){const en=(localStorage.getItem('sl_admin_lang')||'zh')==
 function applyAdminCapI18n(w){if(!w)return;const i=adminCapI18n();w.setAttribute('data-cap-i18n-initial-state',i.initial);w.setAttribute('data-cap-i18n-verifying-label',i.verifying);w.setAttribute('data-cap-i18n-solved-label',i.solved);w.setAttribute('data-cap-i18n-error-label',i.error);w.setAttribute('data-cap-i18n-troubleshooting-label',i.troubleshooting);w.setAttribute('data-cap-i18n-wasm-disabled',i.wasm);w.setAttribute('data-cap-i18n-verify-aria-label',i.verifyAria);w.setAttribute('data-cap-i18n-verifying-aria-label',i.verifyingAria);w.setAttribute('data-cap-i18n-verified-aria-label',i.verifiedAria);w.setAttribute('data-cap-i18n-required-label',i.required);w.setAttribute('data-cap-i18n-error-aria-label',i.errorAria)}
 function renderAdminCap(){if(!adminCaptchaCfg.enabled||!adminCaptchaCfg.capEndpoint)return;ensureAdminCapScript();const w=document.getElementById('admin-cap-widget');if(!w)return;applyAdminCapI18n(w);w.setAttribute('data-cap-api-endpoint',adminCaptchaCfg.capEndpoint);w.setAttribute('data-cap-worker-count','1');if(w.dataset.capBound==='1')return;w.dataset.capBound='1';w.addEventListener('solve',e=>{adminCapToken=e.detail?.token||e.detail||getAdminCapToken()})}
 function getAdminCapToken(){return adminCapToken||document.querySelector('#admin-cap-widget input[name="cap-token"]')?.value||document.querySelector('[name="cap-token"]')?.value||''}
+function resetAdminCaptchaState(){adminCapToken='';adminCFRendered=false;try{if(window.turnstile)turnstile.reset('#admin-cf-widget')}catch(e){}}
+function requireAdminCaptcha(provider){adminCaptchaRequired.value=true;adminCaptchaProvider.value=provider||'cap';adminCaptchaEscalated.value=adminCaptchaProvider.value==='turnstile';nextTick(()=>{if(adminCaptchaProvider.value==='turnstile'){ensureAdminTurnstileScript();renderAdminTurnstile()}else{renderAdminCap()}})}
+function handleAdminCaptchaError(err){const raw=err&&err.data?err.data:err;const cap=raw&&raw.captcha;if(!cap&&!['captcha_required','captcha_escalation_required'].includes(raw&&raw.error))return false;resetAdminCaptchaState();requireAdminCaptcha((cap&&cap.provider)||(raw.error==='captcha_escalation_required'?'turnstile':'cap'));return true}
 
 
 createApp({
   setup() {
     const isLogin = ref(false), cp = ref('dashboard'), loading = ref(false);
-    const lu = ref(''), lp = ref(''), lt = ref(''), le = ref(''), cfLoginEnabled = ref(false), captchaLoginEnabled = ref(false);
+    const lu = ref(''), lp = ref(''), lt = ref(''), le = ref(''), loginTotpRequired = ref(false), adminCaptchaRequired = ref(false), adminCaptchaProvider = ref('cap'), adminCaptchaEscalated = ref(false);
     const dash = reactive({ tl: 0, tc: 0, pr: 0, ab: 0 });
     const st = reactive({ db: '...', redis: '...', uptime: '', goroutines: 0, mem_alloc: 0, mem_heap: 0, mem_sys: 0, mem_stack: 0, num_gc: 0, last_gc_seconds: -1, go_version: '', version: '', suffix: '', cpu_count: 0, container_mem: 0, container_limit: 0, container_pct: 0, container_limit_known: false, host_total: 0, host_used: 0, host_avail: 0, host_pct: 0, load1: '-', load5: '-', load15: '-', disk_total: 0, disk_used: 0, disk_free: 0, disk_pct: 0 });
     const links = ref([]), keys = ref([]), bans = ref([]), reports = ref([]), auditLogs = ref([]), domains = ref([]);
+    const keyModal = reactive({ open:false, saving:false, name:'', purpose:'', permissions:['links:create'], quota_per_minute:0, quota_per_day:0, quota_per_month:0, allowed_domains:'', denied_domains:'', expires_at:'' });
+    const keyReveal = reactive({ open:false, api_key:'', key_fingerprint:'', id:null });
+    const keyPerms = ['links:create','links:batch_create','stats:read_own','*'];
     const totpUri = ref(''), totpCode = ref(''), totpVerified = ref(false), totpLoading = ref(false);
     const s = reactive({
       suffix: '', shortlink_length: 6,
@@ -103,17 +109,19 @@ createApp({
     const L = (zh, en) => (lang.value === 'en' ? en : zh);
 	    const setLang = (l) => { lang.value=l; applyLang(l); nextTick(renderAdminCap); };
 	    if (window.matchMedia) matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{if(themeMode.value==='system')applyTheme('system')});
-		    fetch('/api/config').then(r=>r.json()).then(j=>{const d=j.data||{}; if(d.cf_enabled&&d.cf_site_key){cfLoginEnabled.value=true; adminCFKey=d.cf_site_key; nextTick(()=>{ensureAdminTurnstileScript();renderAdminTurnstile()})} if(d.captcha_enabled&&d.captcha_provider==='cap'&&d.cap_api_endpoint){captchaLoginEnabled.value=true; adminCaptchaCfg={enabled:true,capEndpoint:d.cap_api_endpoint}; nextTick(renderAdminCap)}}).catch(()=>{});
+		    fetch('/api/config').then(r=>r.json()).then(j=>{const d=j.data||{}; adminCFKey=d.cf_site_key||''; if(d.captcha_enabled&&d.cap_api_endpoint){adminCaptchaCfg={enabled:true,normalProvider:d.captcha_normal_provider||d.captcha_provider||'cap',capEndpoint:d.cap_api_endpoint}; if(adminCaptchaCfg.normalProvider==='cap'){adminCaptchaRequired.value=true;adminCaptchaProvider.value='cap';nextTick(renderAdminCap)}}}).catch(()=>{});api(b('/api/login-state')).then(d=>{loginTotpRequired.value=!!d.totp_required}).catch(()=>{});
 
     const doLogin = async () => {
-      le.value = ''; loading.value = true;
+      le.value = '';
+      if (loginTotpRequired.value && !/^\d{6}$/.test(lt.value.trim())) { le.value = L('请输入 6 位动态验证码','Enter the 6-digit TOTP code'); return; }
+      loading.value = true;
       try {
-        const cf=document.querySelector('#admin-cf-widget [name="cf-turnstile-response"]')?.value||'';
-        const cap=getAdminCapToken();
-        await api(b('/api/login'), { method: 'POST', body: JSON.stringify({ username: lu.value, password: lp.value, totp: lt.value, cap_token: cap, cf_turnstile_response: cf }) });
+        const cf=adminCaptchaProvider.value==='turnstile'?(document.querySelector('#admin-cf-widget [name="cf-turnstile-response"]')?.value||''):'';
+        const cap=adminCaptchaProvider.value==='cap'?getAdminCapToken():'';
+        await api(b('/api/login'), { method: 'POST', body: JSON.stringify({ username: lu.value, password: lp.value, totp: loginTotpRequired.value ? lt.value.trim() : '', cap_token: cap, cf_turnstile_response: cf }) });
         isLogin.value = true; nav('dashboard');
         try { const v = await api(b('/api/version')); if (v && v.version) appVersion.value = v.version; } catch(e){}
-      } catch (e) { le.value = e.message; }
+      } catch (e) { le.value = handleAdminCaptchaError(e) ? L('请完成当前安全验证后重试','Complete the security check and try again') : (e.message==='invalid credentials'?L('用户名、密码或动态验证码错误','Wrong username, password, or TOTP code'):e.message); }
       finally { loading.value = false; }
     };
     const doLogout = async () => {
@@ -140,8 +148,13 @@ createApp({
     const ldLinks = async () => { try { const d = await api(b('/api/links')); links.value = (d.list||[]).map(l=>({...l,created_at:l.created_at?new Date(l.created_at).toLocaleString():''})); } catch(e){} };
     const delLink = async (code) => { try { await ElMessageBox.confirm('确认删除短链 '+code+' ?','删除确认',{type:'warning',confirmButtonText:'删除',cancelButtonText:'取消'}); await api(b('/api/links/'+code),{method:'DELETE'}); ElMessage.success('已删除'); ldLinks(); } catch(e){} };
     const ldKeys = async () => { try { keys.value = await api(b('/api/apikeys')); } catch(e){} };
-    const createKey = async () => { try { const name=prompt('Key 名称','Key-'+Date.now()); if(!name)return; const purpose=prompt('用途说明','')||''; const permissions=(prompt('权限，逗号分隔','links:create,links:batch_create,stats:read_own')||'links:create').split(',').map(x=>x.trim()).filter(Boolean); const quota_per_day=+(prompt('每日额度，0=不限','0')||0); const d = await api(b('/api/apikeys'),{method:'POST',body:JSON.stringify({name,purpose,permissions,quota_per_day})}); ElMessage.success('API Key: '+d.api_key); ldKeys(); } catch(e){ElMessage.error(e.message)} };
-    const revokeKey = async (id) => { try { await api(b('/api/apikeys/'+id+'/revoke'),{method:'POST'}); ElMessage.success('已吊销'); ldKeys(); } catch(e){ElMessage.error(e.message)} }; const delKey = async (id) => { try { await ElMessageBox.confirm('确认删除此 API Key?','删除确认',{type:'warning'}); await api(b('/api/apikeys/'+id),{method:'DELETE'}); ldKeys(); } catch(e){} };
+    const fmtTime = (v) => v ? new Date(v).toLocaleString() : '-';
+    const parsePerms = (raw) => { try { const arr=JSON.parse(raw||'[]'); return Array.isArray(arr)&&arr.length?arr:['links:create']; } catch(e) { return ['links:create']; } };
+    const openKeyModal = () => { Object.assign(keyModal,{open:true,saving:false,name:'',purpose:'',permissions:['links:create'],quota_per_minute:0,quota_per_day:0,quota_per_month:0,allowed_domains:'',denied_domains:'',expires_at:''}); };
+    const submitKey = async () => { if(!keyModal.name.trim()){ElMessage.error(L('请填写 Key 名称','Enter a key name'));return;} keyModal.saving=true; try { const payload={name:keyModal.name.trim(),purpose:keyModal.purpose.trim(),permissions:keyModal.permissions.length?keyModal.permissions:['links:create'],quota_per_minute:Math.max(0,Number(keyModal.quota_per_minute)||0),quota_per_day:Math.max(0,Number(keyModal.quota_per_day)||0),quota_per_month:Math.max(0,Number(keyModal.quota_per_month)||0),allowed_domains:keyModal.allowed_domains.trim(),denied_domains:keyModal.denied_domains.trim()}; if(keyModal.expires_at)payload.expires_at=new Date(keyModal.expires_at).toISOString(); const d=await api(b('/api/apikeys'),{method:'POST',body:JSON.stringify(payload)}); keyModal.open=false; Object.assign(keyReveal,{open:true,api_key:d.api_key||'',key_fingerprint:d.key_fingerprint||'',id:d.id}); await ldKeys(); } catch(e){ElMessage.error(e.message)} finally {keyModal.saving=false;} };
+    const revealKey = async (k) => { if(k.revoked){ElMessage.error(L('已吊销的 Key 不能查看','Revoked keys cannot be revealed'));return;} try { const d=await api(b('/api/apikeys/'+k.id+'/reveal'),{method:'POST'}); Object.assign(keyReveal,{open:true,api_key:d.api_key||'',key_fingerprint:d.key_fingerprint||'',id:d.id}); } catch(e){ElMessage.error(e.message)} };
+    const copyKey = async () => { try { await navigator.clipboard.writeText(keyReveal.api_key); ElMessage.success(L('已复制 API Key','API key copied')); } catch(e){ ElMessage.error(L('复制失败，请手动选择复制','Copy failed; select and copy manually')); } };
+    const revokeKey = async (id) => { try { await ElMessageBox.confirm(L('吊销后该 Key 将无法继续调用 API，确认吊销？','This key will no longer be able to call the API. Revoke it?'),L('吊销确认','Revoke key'),{type:'warning',confirmButtonText:L('吊销','Revoke'),cancelButtonText:L('取消','Cancel')}); await api(b('/api/apikeys/'+id+'/revoke'),{method:'POST'}); ElMessage.success('已吊销'); ldKeys(); } catch(e){} }; const delKey = async (id) => { try { await ElMessageBox.confirm('确认删除此 API Key?','删除确认',{type:'warning'}); await api(b('/api/apikeys/'+id),{method:'DELETE'}); ldKeys(); } catch(e){} };
     const ldBans = async () => { try { bans.value = await api(b('/api/bans')); } catch(e){} };
     const doUnban = async (id) => { try { await api(b('/api/bans/'+id),{method:'DELETE'}); ElMessage.success('已解封'); ldBans(); ldDash(); } catch(e){} };
     const ldReports = async () => { try { reports.value = await api(b('/api/reports?status=0')); } catch(e){} };
@@ -266,9 +279,9 @@ createApp({
     const rateCreatePct = computed(() => Math.min(100, Math.round(Number(s.rate_create) || 0)));
     const rateRedirectPct = computed(() => Math.min(100, Math.round(Number(s.rate_redirect) || 0)));
 
-    return { isLogin,cp,loading,lu,lp,lt,le,cfLoginEnabled,captchaLoginEnabled,dash,st,links,keys,bans,reports,totpUri,s,appVersion,
-      doLogin,doLogout,nav,ldLinks,delLink,ldKeys,createKey,revokeKey,delKey,ldBans,doUnban,ldReports,doHandle,doAuto,
-      ldSettings,doSave,doSaveMessages,doSaveSecurityLimits,doRotate,doReload,memPercent,rateCreatePct,rateRedirectPct,themeMode,lang,setThemeMode,setLang,tt,L,totpCode,totpVerified,totpLoading,doVerifyTOTP,addPublicMessage,removePublicMessage,auditLogs,domains,addDomain,delDomain,TTL_PRESETS,ttlLabel,toggleTTLOption,ttlSummary };
+    return { isLogin,cp,loading,lu,lp,lt,le,loginTotpRequired,adminCaptchaRequired,adminCaptchaProvider,adminCaptchaEscalated,dash,st,links,keys,bans,reports,totpUri,s,appVersion,
+      doLogin,doLogout,nav,ldLinks,delLink,ldKeys,openKeyModal,submitKey,revealKey,copyKey,revokeKey,delKey,ldBans,doUnban,ldReports,doHandle,doAuto,
+      ldSettings,doSave,doSaveMessages,doSaveSecurityLimits,doRotate,doReload,memPercent,rateCreatePct,rateRedirectPct,themeMode,lang,setThemeMode,setLang,tt,L,totpCode,totpVerified,totpLoading,doVerifyTOTP,addPublicMessage,removePublicMessage,auditLogs,domains,addDomain,delDomain,TTL_PRESETS,ttlLabel,toggleTTLOption,ttlSummary,keyModal,keyReveal,keyPerms,fmtTime,parsePerms };
   },
   template: `
   <!-- LOGIN -->
@@ -279,8 +292,8 @@ createApp({
       <div class="sub">{{tt('loginSub')}}</div>
       <div class="fi"><label>{{tt('username')}}</label><input v-model="lu" type="text" placeholder="admin" autocomplete="username" @keyup.enter="doLogin"></div>
       <div class="fi"><label>{{tt('password')}}</label><input v-model="lp" type="password" placeholder="••••••••" autocomplete="current-password" @keyup.enter="doLogin"></div>
-      <div class="fi"><label>{{tt('totp')}}</label><input v-model="lt" type="text" :placeholder="L('可选 · 6位数字','Optional · 6 digits')" maxlength="6" autocomplete="off" @keyup.enter="doLogin"></div>
-      <div v-if="captchaLoginEnabled" style="display:flex;justify-content:center;margin:8px 0"><cap-widget id="admin-cap-widget"></cap-widget></div><div v-if="cfLoginEnabled" style="display:flex;justify-content:center;margin:8px 0"><div id="admin-cf-widget"></div></div>
+      <div class="fi" v-if="loginTotpRequired"><label>{{tt('totp')}}</label><input v-model="lt" type="text" :placeholder="L('请输入 6 位动态验证码','Enter 6-digit code')" maxlength="6" inputmode="numeric" autocomplete="one-time-code" @keyup.enter="doLogin"></div>
+      <div v-if="adminCaptchaRequired && adminCaptchaProvider==='cap'" style="display:flex;justify-content:center;margin:8px 0"><cap-widget id="admin-cap-widget"></cap-widget></div><div v-if="adminCaptchaRequired && adminCaptchaProvider==='turnstile'" style="display:flex;justify-content:center;margin:8px 0"><div id="admin-cf-widget"></div></div>
       <div class="err">{{ le }}</div>
       <button class="btn" @click="doLogin" :disabled="loading">{{ loading ? tt('verifying') : tt('login') }}</button>
     </div>
@@ -418,15 +431,27 @@ createApp({
       <!-- API KEYS -->
       <div v-if="cp==='apikeys'">
         <h2>API Keys</h2>
-        <p class="page-desc">{{L('管理外部接入密钥','Manage external API keys')}}</p>
-        <div style="margin-bottom:16px"><button class="btn1" @click="createKey">+ 创建新 Key</button></div>
-        <table><tr><th>名称</th><th>用途</th><th>权限</th><th>每日额度</th><th>状态</th><th>操作</th></tr>
+        <p class="page-desc">{{L('管理外部接入密钥；新 Key 支持认证管理员二次查看','Manage external API keys; new keys can be revealed again by authenticated admins')}}</p>
+        <div style="margin-bottom:16px"><button class="btn1" @click="openKeyModal">+ {{L('创建新 Key','Create API key')}}</button></div>
+        <div v-if="keyModal.open" class="panel">
+          <div class="panel-header"><div class="panel-title">{{L('创建 API Key','Create API key')}}</div><button class="btn4" @click="keyModal.open=false">{{L('取消','Cancel')}}</button></div>
+          <div class="frow"><div class="fi"><label>{{L('名称','Name')}}</label><input v-model="keyModal.name" placeholder="Key name"></div><div class="fi"><label>{{L('用途','Purpose')}}</label><input v-model="keyModal.purpose" placeholder="CI / integration"></div></div>
+          <div class="fi"><label>{{L('权限','Permissions')}}</label><div style="display:flex;gap:10px;flex-wrap:wrap"><label v-for="perm in keyPerms" :key="perm" style="font-size:12px;font-weight:800;color:var(--text)"><input type="checkbox" v-model="keyModal.permissions" :value="perm" style="width:auto;margin-right:6px">{{perm}}</label></div></div>
+          <div class="frow"><div class="fi"><label>{{L('每分钟额度','Quota/min')}}</label><input type="number" min="0" v-model.number="keyModal.quota_per_minute"></div><div class="fi"><label>{{L('每日额度','Quota/day')}}</label><input type="number" min="0" v-model.number="keyModal.quota_per_day"></div><div class="fi"><label>{{L('每月额度','Quota/month')}}</label><input type="number" min="0" v-model.number="keyModal.quota_per_month"></div></div>
+          <div class="frow"><div class="fi"><label>{{L('允许域名','Allowed domains')}}</label><input v-model="keyModal.allowed_domains" placeholder="example.com,*.example.org"></div><div class="fi"><label>{{L('禁止域名','Denied domains')}}</label><input v-model="keyModal.denied_domains" placeholder="bad.example"></div><div class="fi"><label>{{L('过期时间','Expires at')}}</label><input type="datetime-local" v-model="keyModal.expires_at"></div></div>
+          <button class="btn1" @click="submitKey" :disabled="keyModal.saving">{{keyModal.saving?L('创建中…','Creating…'):L('创建并显示 Key','Create and reveal key')}}</button>
+        </div>
+        <div v-if="keyReveal.open" class="alert alert-info" style="display:block">
+          <b>{{L('API Key 可再次查看','API key can be revealed again')}}</b><div style="margin:8px 0;color:var(--t2)">{{L('任何能进入后台的管理员都能显示它；泄露后请立即吊销。','Any admin with console access can reveal it; revoke immediately if exposed.')}}</div>
+          <input class="tool-input" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace" readonly :value="keyReveal.api_key"><div style="margin-top:10px;display:flex;gap:8px"><button class="btn1" @click="copyKey">{{L('复制 API Key','Copy API key')}}</button><button class="btn4" @click="keyReveal.open=false">{{L('关闭','Close')}}</button></div>
+        </div>
+        <table><tr><th>名称</th><th>指纹</th><th>用途</th><th>权限</th><th>额度</th><th>使用情况</th><th>状态</th><th>操作</th></tr>
         <tr v-for="k in keys" :key="k.id">
-          <td style="font-weight:500">{{k.name}}</td><td>{{k.purpose||'-'}}</td><td style="max-width:240px;word-break:break-all">{{k.permissions_json||'links:create'}}</td><td>{{k.quota_per_day||'不限'}}</td>
+          <td style="font-weight:500">{{k.name}}</td><td><span class="tag">{{k.key_prefix||'legacy'}}…{{k.key_fingerprint||'需重建'}}</span></td><td>{{k.purpose||'-'}}</td><td style="max-width:220px;word-break:break-all"><span v-for="p in parsePerms(k.permissions_json)" :key="p" class="tag" style="margin:2px">{{p}}</span></td><td>{{k.quota_per_day?L('日 ','day ')+k.quota_per_day:L('不限','Unlimited')}}</td><td>{{L('创建','Created')}} {{fmtTime(k.created_at)}}<br>{{L('最后使用','Last used')}} {{fmtTime(k.last_used_at)}}</td>
           <td><span :style="{color:k.revoked?'var(--danger)':'var(--success)',fontWeight:600,fontSize:'12px'}">{{k.revoked?'已吊销':'正常'}}</span></td>
-          <td><button class="btn3" @click="revokeKey(k.id)">吊销</button> <button class="btn2" @click="delKey(k.id)">删除</button></td>
+          <td><button class="btn3" @click="revealKey(k)" :disabled="k.revoked">查看</button> <button class="btn3" @click="revokeKey(k.id)" :disabled="k.revoked">吊销</button> <button class="btn2" @click="delKey(k.id)">删除</button></td>
         </tr>
-        <tr v-if="keys.length===0"><td colspan="6" style="text-align:center;padding:40px;color:var(--t3)">{{L('暂无 API Key','No API keys yet')}}</td></tr>
+        <tr v-if="keys.length===0"><td colspan="8" style="text-align:center;padding:40px;color:var(--t3)">{{L('暂无 API Key','No API keys yet')}}</td></tr>
         </table>
       </div>
 

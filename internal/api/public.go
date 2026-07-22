@@ -3,11 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"math"
 	"net"
 	"net/http"
 	"net/url"
-	"runtime"
 	"shortlink/internal/config"
 	"shortlink/internal/model"
 	"shortlink/internal/service"
@@ -75,14 +73,15 @@ type PublicHandler struct {
 	reportSvc     *service.ReportService
 	modSvc        *service.ModerationService
 	safeScanner   *service.SafeScanner
+	statusSvc     *service.StatusService
 	cfg           *config.Config
 }
 
 func NewPublicHandler(linkSvc *service.LinkService, apiKeySvc *service.APIKeyService, wordFilterSvc *service.WordFilterService, banSvc *service.BanService,
-	adminSvc *service.AdminService, reportSvc *service.ReportService, modSvc *service.ModerationService, safeScanner *service.SafeScanner, cfg *config.Config) *PublicHandler {
+	adminSvc *service.AdminService, reportSvc *service.ReportService, modSvc *service.ModerationService, safeScanner *service.SafeScanner, statusSvc *service.StatusService, cfg *config.Config) *PublicHandler {
 	return &PublicHandler{
 		linkSvc: linkSvc, apiKeySvc: apiKeySvc, wordFilterSvc: wordFilterSvc, banSvc: banSvc,
-		adminSvc: adminSvc, reportSvc: reportSvc, modSvc: modSvc, safeScanner: safeScanner, cfg: cfg,
+		adminSvc: adminSvc, reportSvc: reportSvc, modSvc: modSvc, safeScanner: safeScanner, statusSvc: statusSvc, cfg: cfg,
 	}
 }
 
@@ -677,89 +676,16 @@ func (h *PublicHandler) GetConfig(c *gin.Context) {
 // ── PublicStatus ──
 
 func (h *PublicHandler) PublicStatus(c *gin.Context) {
-	started := time.Now()
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 800*time.Millisecond)
-	defer cancel()
-
-	dbOK := true
-	if _, err := h.adminSvc.GetSettings(ctx); err != nil {
-		dbOK = false
+	if h.statusSvc == nil {
+		Error(c, http.StatusServiceUnavailable, "status unavailable")
+		return
 	}
-	redisOK, _ := h.adminSvc.CheckRedis(ctx)
-	latencyMs := int(time.Since(started).Milliseconds())
-	if latencyMs < 1 {
-		latencyMs = 1
+	status, err := h.statusSvc.PublicStatus(c.Request.Context(), time.Now())
+	if err != nil {
+		Error(c, http.StatusServiceUnavailable, "status unavailable")
+		return
 	}
-
-	available := dbOK && redisOK
-	base := 100.0
-	if !dbOK {
-		base -= 35
-	}
-	if !redisOK {
-		base -= 12
-	}
-	if runtime.NumGoroutine() > 500 {
-		base -= 3
-	}
-	if latencyMs > 800 {
-		base -= 5
-	} else if latencyMs > 300 {
-		base -= 2
-	}
-	if base < 0 {
-		base = 0
-	}
-
-	periods := []struct {
-		Key     string
-		Samples int
-		Drift   float64
-	}{
-		{Key: "1h", Samples: 60, Drift: 0},
-		{Key: "24h", Samples: 288, Drift: 0.3},
-		{Key: "30d", Samples: 720, Drift: 0.8},
-	}
-
-	items := make([]gin.H, 0, len(periods))
-	for _, p := range periods {
-		uptime := base - p.Drift
-		if !available {
-			uptime = math.Max(0, uptime)
-		}
-		uptime = math.Round(uptime*10) / 10
-		bars := make([]string, 0, 60)
-		for i := 0; i < 60; i++ {
-			state := "ok"
-			if !available && i >= 54 {
-				state = "down"
-			} else if available && (latencyMs > 300) && i%17 == 0 {
-				state = "slow"
-			}
-			bars = append(bars, state)
-		}
-		items = append(items, gin.H{
-			"key":              p.Key,
-			"label":            p.Key,
-			"available":        available,
-			"status":           map[bool]string{true: "online", false: "degraded"}[available],
-			"latency_ms":       latencyMs,
-			"uptime_percent":   uptime,
-			"last_checked_min": 0,
-			"samples":          p.Samples,
-			"bars":             bars,
-		})
-	}
-
-	JSON(c, http.StatusOK, gin.H{
-		"service": "Shortlink",
-		"summary": gin.H{
-			"available":  available,
-			"status":     map[bool]string{true: "online", false: "degraded"}[available],
-			"latency_ms": latencyMs,
-		},
-		"periods": items,
-	})
+	JSON(c, http.StatusOK, status)
 }
 
 func (h *PublicHandler) BatchCreateLinks(c *gin.Context) {

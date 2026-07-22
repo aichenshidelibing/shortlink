@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    container_name: shortlink-app
+    container_name: ${CONTAINER_PREFIX:-shortlink}-app
     ports:
       # Bind to loopback only. Public exposure is the reverse proxy's job
       # (see nginx/ or your host firewall). Publishing on 0.0.0.0 would
@@ -40,6 +40,32 @@ services:
       - CAP_ADMIN_KEY=${CAP_ADMIN_KEY:-}
       - CAP_HTTP_PORT=${CAP_HTTP_PORT:-3000}
       - CAP_INTERNAL_URL=${CAP_INTERNAL_URL:-http://cap:3000}
+      - FEISHU_ENABLED=${FEISHU_ENABLED:-false}
+      - FEISHU_WEBHOOK=${FEISHU_WEBHOOK:-}
+      - FEISHU_SECRET=${FEISHU_SECRET:-}
+      - TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - DINGTALK_ENABLED=${DINGTALK_ENABLED:-false}
+      - DINGTALK_WEBHOOK=${DINGTALK_WEBHOOK:-}
+      - DINGTALK_SECRET=${DINGTALK_SECRET:-}
+      - WECOM_ENABLED=${WECOM_ENABLED:-false}
+      - WECOM_WEBHOOK=${WECOM_WEBHOOK:-}
+      - BARK_ENABLED=${BARK_ENABLED:-false}
+      - BARK_KEY=${BARK_KEY:-}
+      - BARK_ENDPOINT=${BARK_ENDPOINT:-}
+      - DISCORD_ENABLED=${DISCORD_ENABLED:-false}
+      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK:-}
+      - EMAIL_ENABLED=${EMAIL_ENABLED:-false}
+      - EMAIL_HOST=${EMAIL_HOST:-}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USER=${EMAIL_USER:-}
+      - EMAIL_PASS=${EMAIL_PASS:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
+      - EMAIL_TO=${EMAIL_TO:-}
+      - WEBHOOK_ENABLED=${WEBHOOK_ENABLED:-false}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
     networks:
       - shortlink
     depends_on:
@@ -67,7 +93,7 @@ services:
 
   cap:
     image: tiago2/cap:latest
-    container_name: shortlink-cap
+    container_name: ${CONTAINER_PREFIX:-shortlink}-cap
     environment:
       - ADMIN_KEY=${CAP_ADMIN_KEY:?CAP_ADMIN_KEY is required}
       - REDIS_URL=redis://cap-valkey:6379
@@ -93,7 +119,7 @@ services:
 
   cap-valkey:
     image: valkey/valkey:9-alpine
-    container_name: shortlink-cap-valkey
+    container_name: ${CONTAINER_PREFIX:-shortlink}-cap-valkey
     command: valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction
     volumes:
       - cap-valkey-data:/data
@@ -113,7 +139,7 @@ services:
 
   mysql:
     image: mysql:8.4
-    container_name: shortlink-mysql
+    container_name: ${CONTAINER_PREFIX:-shortlink}-mysql
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
       - MYSQL_DATABASE=${DB_NAME:-shortlink}
@@ -139,7 +165,7 @@ services:
 
   redis:
     image: redis:8.8.0-alpine
-    container_name: shortlink-redis
+    container_name: ${CONTAINER_PREFIX:-shortlink}-redis
     # requirepass hardens the redis instance even though it's on a private
     # docker network — defense-in-depth in case the compose file is later
     # reused with an exposed port.

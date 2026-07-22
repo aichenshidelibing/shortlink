@@ -188,6 +188,11 @@ func (h *AdminHandler) ListAPIKeys(c *gin.Context) {
 	JSON(c, http.StatusOK, keys)
 }
 
+func (h *AdminHandler) LoginState(c *gin.Context) {
+	required, _ := h.adminSvc.LoginTOTPRequired(c.Request.Context())
+	JSON(c, http.StatusOK, gin.H{"totp_required": required})
+}
+
 func (h *AdminHandler) CreateAPIKey(c *gin.Context) {
 	var req struct {
 		Name           string   `json:"name"`
@@ -220,7 +225,28 @@ func (h *AdminHandler) CreateAPIKey(c *gin.Context) {
 		return
 	}
 	h.audit("admin", "", "apikey_create", "apikey", strconv.FormatUint(key.ID, 10), c, "")
-	JSON(c, http.StatusOK, gin.H{"api_key": plainKey, "id": key.ID, "expires_at": key.ExpiresAt})
+	JSON(c, http.StatusOK, gin.H{
+		"api_key":         plainKey,
+		"id":              key.ID,
+		"expires_at":      key.ExpiresAt,
+		"key_fingerprint": key.KeyFingerprint,
+		"key_prefix":      key.KeyPrefix,
+	})
+}
+
+func (h *AdminHandler) RevealAPIKey(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		Error(c, http.StatusBadRequest, "invalid api key id")
+		return
+	}
+	plain, key, err := h.apiKeySvc.Reveal(c.Request.Context(), id)
+	if err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	h.audit("admin", "", "apikey_reveal", "apikey", strconv.FormatUint(key.ID, 10), c, "")
+	JSON(c, http.StatusOK, gin.H{"api_key": plain, "id": key.ID, "key_fingerprint": key.KeyFingerprint})
 }
 
 func (h *AdminHandler) UpdateAPIKey(c *gin.Context) {

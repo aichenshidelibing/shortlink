@@ -5,6 +5,9 @@ import "time"
 type APIKey struct {
 	ID              uint64     `gorm:"primaryKey" json:"id"`
 	KeyHash         string     `gorm:"size:255;uniqueIndex;not null" json:"-"`
+	KeyEnc          string     `gorm:"type:text" json:"-"`
+	KeyFingerprint  string     `gorm:"size:16;index" json:"key_fingerprint,omitempty"`
+	KeyPrefix       string     `gorm:"size:12" json:"key_prefix,omitempty"`
 	Name            string     `gorm:"size:100" json:"name"`
 	Purpose         string     `gorm:"size:255" json:"purpose"`
 	PermissionsJSON string     `gorm:"type:text" json:"permissions_json"`
