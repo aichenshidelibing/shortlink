@@ -178,6 +178,9 @@ docker compose up --build -d
 ### 常用命令
 
 ```bash
+# 安全升级：拉取 origin/main 最新版本，复用现有密钥、配置和数据卷
+bash deploy.sh upgrade
+
 # 查看日志
 docker compose logs -f app
 

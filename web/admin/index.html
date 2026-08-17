@@ -252,6 +252,12 @@ createApp({
       } catch(e){ ElMessage.error(e.message); }
     };
 
+    const testNotification = async (provider) => {
+      try {
+        await api(b('/api/settings/notification/test'), { method:'POST', body: JSON.stringify({provider}) });
+        ElMessage.success((provider || '') + ' 通知测试已发送');
+      } catch(e) { ElMessage.error(e.message || '通知测试失败'); }
+    };
     const doSave = async () => {
       try {
         const d = await api(b('/api/settings'),{method:'PUT',body:JSON.stringify({shortlink_length:s.shortlink_length,settings:buildJSON()})});
@@ -660,21 +666,21 @@ createApp({
 
         <div class="section">{{L('🔔 通知渠道','🔔 Notifications')}}</div>
         <div class="notice-matrix"><div><b>{{L('通知矩阵','Notification matrix')}}</b><span>{{L('启用的渠道会并发发送；单个渠道超时或失败不会阻塞其它渠道。缺少必填字段的渠道会被自动跳过并写入服务日志。','Enabled channels send in parallel; one channel timing out or failing does not block the others. Missing required fields are skipped and logged.')}}</span></div><i>8s timeout</i></div>
-        <div class="frow"><div class="fi"><label>飞书</label><select v-model="s.feishu"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>飞书</label><select v-model="s.feishu"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.feishu" class="btn1" @click="testNotification('feishu')">测试</button></div></div>
         <div v-if="s.feishu" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.feishu_webhook"></div><div class="fi"><label>签名 Secret</label><input v-model="s.feishu_secret"></div></div>
-        <div class="frow"><div class="fi"><label>Telegram</label><select v-model="s.telegram"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>Telegram</label><select v-model="s.telegram"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.telegram" class="btn1" @click="testNotification('telegram')">测试</button></div></div>
         <div v-if="s.telegram" class="frow"><div class="fi"><label>Bot Token</label><input v-model="s.tg_token"></div><div class="fi"><label>Chat ID</label><input v-model="s.tg_chat"></div></div>
-        <div class="frow"><div class="fi"><label>钉钉</label><select v-model="s.dingtalk"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>钉钉</label><select v-model="s.dingtalk"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.dingtalk" class="btn1" @click="testNotification('dingtalk')">测试</button></div></div>
         <div v-if="s.dingtalk" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.ding_webhook"></div><div class="fi"><label>签名 Secret</label><input v-model="s.ding_secret"></div></div>
-        <div class="frow"><div class="fi"><label>企业微信</label><select v-model="s.wecom"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>企业微信</label><select v-model="s.wecom"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.wecom" class="btn1" @click="testNotification('wecom')">测试</button></div></div>
         <div v-if="s.wecom" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.wecom_webhook"></div></div>
-        <div class="frow"><div class="fi"><label>Bark</label><select v-model="s.bark"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>Bark</label><select v-model="s.bark"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.bark" class="btn1" @click="testNotification('bark')">测试</button></div></div>
         <div v-if="s.bark" class="frow"><div class="fi"><label>Bark Key</label><input v-model="s.bark_key"></div><div class="fi"><label>Endpoint</label><input v-model="s.bark_endpoint" placeholder="https://api.day.app"></div></div>
-        <div class="frow"><div class="fi"><label>Discord</label><select v-model="s.discord"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>Discord</label><select v-model="s.discord"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.discord" class="btn1" @click="testNotification('discord')">测试</button></div></div>
         <div v-if="s.discord" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.discord_webhook"></div></div>
-        <div class="frow"><div class="fi"><label>Email SMTP</label><select v-model="s.email"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>Email SMTP</label><select v-model="s.email"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.email" class="btn1" @click="testNotification('email')">测试</button></div></div>
         <div v-if="s.email" class="frow"><div class="fi"><label>SMTP Host</label><input v-model="s.email_host"></div><div class="fi"><label>Port</label><input v-model="s.email_port"></div><div class="fi"><label>User</label><input v-model="s.email_user"></div><div class="fi"><label>Password</label><input type="password" v-model="s.email_pass"></div><div class="fi"><label>From</label><input v-model="s.email_from"></div><div class="fi"><label>To</label><input v-model="s.email_to" placeholder="a@example.com,b@example.com"></div></div>
-        <div class="frow"><div class="fi"><label>通用 Webhook</label><select v-model="s.webhook"><option :value="false">关闭</option><option :value="true">启用</option></select></div></div>
+        <div class="frow"><div class="fi"><label>通用 Webhook</label><select v-model="s.webhook"><option :value="false">关闭</option><option :value="true">启用</option></select><button v-if="s.webhook" class="btn1" @click="testNotification('webhook')">测试</button></div></div>
         <div v-if="s.webhook" class="frow"><div class="fi"><label>Webhook URL</label><input v-model="s.webhook_url"></div><div class="fi"><label>Secret Header</label><input v-model="s.webhook_secret"></div></div>
 
         <div class="section">{{L('🤖 AI 审核（OpenAI Moderation）','🤖 AI review (OpenAI Moderation)')}}</div>

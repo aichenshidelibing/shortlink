@@ -513,6 +513,25 @@ func (h *AdminHandler) settingsWithRuntimeDefaults(settingsJSON string) string {
 	return string(buf)
 }
 
+func (h *AdminHandler) TestNotification(c *gin.Context) {
+	var req struct {
+		Provider string `json:"provider" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Error(c, http.StatusBadRequest, "provider is required")
+		return
+	}
+	if err := h.noticeSvc.SendTest(c.Request.Context(), req.Provider); err != nil {
+		if strings.Contains(err.Error(), "unsupported") || strings.Contains(err.Error(), "not enabled") {
+			Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		Error(c, http.StatusBadGateway, "notification test failed")
+		return
+	}
+	JSON(c, http.StatusOK, gin.H{"message": "notification test sent", "provider": strings.ToLower(strings.TrimSpace(req.Provider))})
+}
+
 func (h *AdminHandler) RotateSuffix(c *gin.Context) {
 	newSuffix, err := h.adminSvc.RotateSuffix(c.Request.Context())
 	if err != nil {

@@ -335,7 +335,7 @@ func main() {
 	r.Use(middleware.BanCheck(banSvc))
 	r.Use(middleware.RateLimit(cacheRepo, &cfg.RateLimit))
 
-	publicHandler := api.NewPublicHandler(linkSvc, apiKeySvc, wordFilterSvc, banSvc, adminSvc, reportSvc, modSvc, safeScanner, statusSvc, cfg)
+	publicHandler := api.NewPublicHandler(linkSvc, apiKeySvc, noticeSvc, wordFilterSvc, banSvc, adminSvc, reportSvc, modSvc, safeScanner, statusSvc, cfg)
 	redirectHandler := api.NewRedirectHandler(linkSvc, linkRepo, clickRepo, clickWorker, strong, statsSvc)
 	adminHandler := api.NewAdminHandler(adminSvc, linkSvc, apiKeySvc, statsSvc, banSvc, wordFilterSvc, noticeSvc, reportSvc, modSvc, auditSvc, domainSvc, captchaSvc, auth.NewSessionManager(cfg.Admin.SessionSecret))
 
@@ -409,6 +409,7 @@ func main() {
 			authd.GET("/stats/:code", adminHandler.GetStats)
 			authd.GET("/settings", adminHandler.GetSettings)
 			authd.PUT("/settings", adminHandler.SaveSettings)
+			authd.POST("/settings/notification/test", adminHandler.TestNotification)
 			authd.POST("/settings/rotate-suffix", adminHandler.RotateSuffix)
 			authd.GET("/bans", adminHandler.ListBans)
 			authd.DELETE("/bans/:id", adminHandler.Unban)

@@ -784,4 +784,68 @@ PY
     echo -e "  停止: docker compose down"
     echo -e "  日志: docker compose logs -f app"
 }
-main "$@"
+upgrade_usage() {
+    echo "用法: bash deploy.sh upgrade"
+    echo "升级模式会拉取 origin/main，复用现有 .env、配置和 Docker 数据卷，不会重新生成密钥。"
+}
+
+run_upgrade() {
+    local branch="${SHORTLINK_UPGRADE_BRANCH:-main}" old_sha new_sha backup_dir
+    if ! command -v git >/dev/null 2>&1 || ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+        echo -e "${RED}升级失败：当前目录不是 Git 仓库${NC}" >&2
+        return 1
+    fi
+    if [ "$(git branch --show-current)" != "$branch" ]; then
+        echo -e "${RED}升级失败：请切换到 ${branch} 分支后重试${NC}" >&2
+        return 1
+    fi
+    if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+        echo -e "${RED}升级失败：工作区存在未提交或未跟踪文件，已停止以避免覆盖本地修改${NC}" >&2
+        return 1
+    fi
+    [ -f "$ENV_FILE" ] || { echo -e "${RED}升级失败：缺少 ${ENV_FILE}，不会进入安装交互流程${NC}" >&2; return 1; }
+
+    ensure_docker
+    load_existing_env "$ENV_FILE"
+    for key in ADMIN_PASSWORD ENCRYPTION_KEY DB_PASSWORD DB_ROOT_PASSWORD REDIS_PASSWORD CAP_ADMIN_KEY; do
+        if [ -z "${!key:-}" ]; then
+            echo -e "${RED}升级失败：${ENV_FILE} 缺少 ${key}${NC}" >&2
+            return 1
+        fi
+    done
+    old_sha=$(git rev-parse HEAD)
+    backup_dir="${SHORTLINK_UPGRADE_BACKUP_DIR:-$SCRIPT_DIR/.shortlink-upgrade-backup-$(date +%Y%m%d-%H%M%S)}"
+    (umask 077; mkdir -p "$backup_dir"; cp "$ENV_FILE" "$backup_dir/env"; [ -f "$CONFIG_FILE" ] && cp "$CONFIG_FILE" "$backup_dir/config.yaml" || true; printf '%s\n' "$old_sha" > "$backup_dir/old-sha")
+
+    echo -e "${YELLOW}>>> 拉取 origin/${branch} 最新版本...${NC}"
+    git fetch --prune origin "$branch" || { echo -e "${RED}拉取失败，未启动新版本${NC}" >&2; return 1; }
+    git merge --ff-only "origin/${branch}" || { echo -e "${RED}升级失败：远程不是快进版本，请人工处理${NC}" >&2; return 1; }
+    new_sha=$(git rev-parse HEAD)
+    [ "$old_sha" != "$new_sha" ] && echo -e "${GREEN}✓ 已更新 ${old_sha:0:12} -> ${new_sha:0:12}${NC}" || echo -e "${GREEN}✓ 已是最新版本 ${new_sha:0:12}${NC}"
+
+    compose config --quiet || { echo -e "${RED}Compose 配置校验失败，未启动新版本${NC}" >&2; return 1; }
+    echo -e "${YELLOW}>>> 保留数据卷并更新服务（不执行 down）...${NC}"
+    compose up --build -d --remove-orphans || {
+        echo -e "${RED}升级启动失败。数据卷未删除；旧版本 SHA: ${old_sha}${NC}" >&2
+        echo "备份目录: ${backup_dir}" >&2
+        echo "可执行 git checkout ${old_sha} 后运行 docker compose up -d 恢复（先确认数据库兼容性）。" >&2
+        return 1
+    }
+    PORT="${HTTP_PORT:-${SERVER_PORT:-8080}}"
+    wait_for_app_ready
+    echo -e "${GREEN}升级完成，配置与数据卷已保留${NC}"
+    echo "备份目录: ${backup_dir}"
+}
+
+case "${1:-}" in
+    upgrade|--upgrade)
+        run_upgrade
+        ;;
+    "")
+        main "$@"
+        ;;
+    *)
+        upgrade_usage >&2
+        exit 2
+        ;;
+esac

@@ -67,6 +67,7 @@ type dynamicSettings struct {
 type PublicHandler struct {
 	linkSvc       *service.LinkService
 	apiKeySvc     *service.APIKeyService
+	noticeSvc     *service.NoticeService
 	wordFilterSvc *service.WordFilterService
 	banSvc        *service.BanService
 	adminSvc      *service.AdminService
@@ -77,10 +78,10 @@ type PublicHandler struct {
 	cfg           *config.Config
 }
 
-func NewPublicHandler(linkSvc *service.LinkService, apiKeySvc *service.APIKeyService, wordFilterSvc *service.WordFilterService, banSvc *service.BanService,
+func NewPublicHandler(linkSvc *service.LinkService, apiKeySvc *service.APIKeyService, noticeSvc *service.NoticeService, wordFilterSvc *service.WordFilterService, banSvc *service.BanService,
 	adminSvc *service.AdminService, reportSvc *service.ReportService, modSvc *service.ModerationService, safeScanner *service.SafeScanner, statusSvc *service.StatusService, cfg *config.Config) *PublicHandler {
 	return &PublicHandler{
-		linkSvc: linkSvc, apiKeySvc: apiKeySvc, wordFilterSvc: wordFilterSvc, banSvc: banSvc,
+		linkSvc: linkSvc, apiKeySvc: apiKeySvc, noticeSvc: noticeSvc, wordFilterSvc: wordFilterSvc, banSvc: banSvc,
 		adminSvc: adminSvc, reportSvc: reportSvc, modSvc: modSvc, safeScanner: safeScanner, statusSvc: statusSvc, cfg: cfg,
 	}
 }
@@ -528,6 +529,14 @@ func (h *PublicHandler) CreateLink(c *gin.Context) {
 
 	baseURL := publicRequestBaseURL(c, h.cfg.Server.TrustedProxy)
 	shortURL := buildShortURL(baseURL, result.Link.ShortCode)
+	if h.noticeSvc != nil {
+		source := "网页"
+		if isAPIKeyRequest {
+			source = "API"
+		}
+		h.noticeSvc.SendLinkCreated(c.Request.Context(), result.Link.ShortCode, shortURL, source, req.Password != "", req.IsOnce)
+	}
+
 	manageURL := buildManageURL(baseURL, result.Link.ShortCode, result.EditToken)
 	JSON(c, http.StatusOK, gin.H{
 		"short_code":      result.Link.ShortCode,
@@ -793,6 +802,10 @@ func (h *PublicHandler) BatchCreateLinks(c *gin.Context) {
 		shortURL := buildShortURL(baseURL, res.Link.ShortCode)
 		manageURL := buildManageURL(baseURL, res.Link.ShortCode, res.EditToken)
 		results = append(results, gin.H{"index": i, "ok": true, "short_code": res.Link.ShortCode, "short_url": shortURL, "edit_token": res.EditToken, "manage_url": manageURL, "qr_show_direct": policy.QRShowDirect, "qr_text": policy.QRText, "qr_template": policy.QRTemplate, "qr_logo_enabled": policy.QRLogoEnabled, "qr_logo_url": policy.QRLogoURL})
+	}
+	if h.noticeSvc != nil && created > 0 {
+		source := "API"
+		h.noticeSvc.SendBatchCreated(c.Request.Context(), len(req.Items), created, failed, source)
 	}
 	JSON(c, http.StatusOK, gin.H{"total": len(req.Items), "created": created, "failed": failed, "results": results})
 }

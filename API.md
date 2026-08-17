@@ -301,6 +301,7 @@ curl -X POST http://localhost:8080/api/v1/links \
 | `GET` | `/{suffix}/api/stats/{code}` | 短链统计 |
 | `GET` | `/{suffix}/api/settings` | 获取设置 |
 | `PUT` | `/{suffix}/api/settings` | 保存设置 |
+| `POST` | `/{suffix}/api/settings/notification/test` | 测试已保存的通知渠道，body 为 `{\"provider\":\"webhook\"}` |
 | `POST` | `/{suffix}/api/settings/rotate-suffix` | 手动轮换管理后缀 |
 | `GET` | `/{suffix}/api/bans` | 封禁列表 |
 | `DELETE` | `/{suffix}/api/bans/{id}` | 解封 |

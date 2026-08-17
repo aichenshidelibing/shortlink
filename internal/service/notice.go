@@ -31,8 +31,11 @@ func NewNoticeService(cfg *config.NotificationConfig, log *zap.Logger) *NoticeSe
 
 func (s *NoticeService) ReloadFromConfig(cfg *config.NotificationConfig) {
 	copy := normalizeNotificationConfig(cfg)
+	providers := s.providersFromConfig(&copy)
 	s.baseCfg.Store(&copy)
-	s.initFromConfig(&copy)
+	s.mu.Lock()
+	s.providers = providers
+	s.mu.Unlock()
 }
 
 func (s *NoticeService) currentConfig() config.NotificationConfig {
@@ -42,9 +45,9 @@ func (s *NoticeService) currentConfig() config.NotificationConfig {
 	return normalizeNotificationConfig(nil)
 }
 
-func (s *NoticeService) initFromConfig(cfg *config.NotificationConfig) {
+func (s *NoticeService) providersFromConfig(cfg *config.NotificationConfig) []notice.Notifier {
 	if cfg == nil {
-		return
+		return nil
 	}
 	providers := make([]notice.Notifier, 0, 8)
 	s.addProvider(&providers, cfg.Feishu.Enabled, "feishu", map[string]string{"webhook": cfg.Feishu.Webhook}, func() notice.Notifier {
@@ -71,7 +74,7 @@ func (s *NoticeService) initFromConfig(cfg *config.NotificationConfig) {
 	s.addProvider(&providers, cfg.Webhook.Enabled, "webhook", map[string]string{"url": cfg.Webhook.URL}, func() notice.Notifier {
 		return notice.NewWebhookNotifier(cfg.Webhook.URL, cfg.Webhook.Secret)
 	})
-	s.providers = providers
+	return providers
 }
 
 type noticeSettings struct {
@@ -101,6 +104,40 @@ type noticeSettings struct {
 	Webhook        bool   `json:"webhook"`
 	WebhookURL     string `json:"webhook_url"`
 	WebhookSecret  string `json:"webhook_secret"`
+}
+
+func noticeSettingsFromConfig(cfg config.NotificationConfig) noticeSettings {
+	return noticeSettings{
+		Feishu: cfg.Feishu.Enabled, FeishuWebhook: cfg.Feishu.Webhook, FeishuSecret: cfg.Feishu.Secret,
+		Telegram: cfg.Telegram.Enabled, TgToken: cfg.Telegram.BotToken, TgChat: cfg.Telegram.ChatID,
+		Dingtalk: cfg.Dingtalk.Enabled, DingWebhook: cfg.Dingtalk.Webhook, DingSecret: cfg.Dingtalk.Secret,
+		WeCom: cfg.WeCom.Enabled, WeComWebhook: cfg.WeCom.Webhook,
+		Bark: cfg.Bark.Enabled, BarkKey: cfg.Bark.Key, BarkEndpoint: cfg.Bark.Endpoint,
+		Discord: cfg.Discord.Enabled, DiscordWebhook: cfg.Discord.Webhook,
+		Email: cfg.Email.Enabled, EmailHost: cfg.Email.Host, EmailPort: cfg.Email.Port, EmailUser: cfg.Email.User, EmailPass: cfg.Email.Pass, EmailFrom: cfg.Email.From, EmailTo: cfg.Email.To,
+		Webhook: cfg.Webhook.Enabled, WebhookURL: cfg.Webhook.URL, WebhookSecret: cfg.Webhook.Secret,
+	}
+}
+
+func applyNoticeSettingsJSON(ns *noticeSettings, raw map[string]json.RawMessage) error {
+	encoded, err := json.Marshal(ns)
+	if err != nil {
+		return err
+	}
+	var merged map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &merged); err != nil {
+		return err
+	}
+	for key, value := range raw {
+		if _, ok := merged[key]; ok {
+			merged[key] = value
+		}
+	}
+	encoded, err = json.Marshal(merged)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(encoded, ns)
 }
 
 func hasNoticeSettings(raw map[string]json.RawMessage) bool {
@@ -134,13 +171,15 @@ func (s *NoticeService) ReloadFromJSON(settingsJSON string) {
 	if !hasNoticeSettings(raw) {
 		return
 	}
-	var ns noticeSettings
-	if err := json.Unmarshal([]byte(settingsJSON), &ns); err != nil {
+
+	ns := noticeSettingsFromConfig(s.currentConfig())
+	if err := applyNoticeSettingsJSON(&ns, raw); err != nil {
 		s.warn("parse notice settings failed", zap.Error(err))
 		return
 	}
-
-	providers := s.providersFromSettings(ns)
+	cfg := notificationConfigFromSettings(ns)
+	providers := s.providersFromConfig(&cfg)
+	s.baseCfg.Store(&cfg)
 	s.mu.Lock()
 	s.providers = providers
 	s.mu.Unlock()
@@ -161,32 +200,29 @@ func normalizeNotificationConfig(cfg *config.NotificationConfig) config.Notifica
 }
 
 func (s *NoticeService) providersFromSettings(ns noticeSettings) []notice.Notifier {
-	providers := make([]notice.Notifier, 0, 8)
-	s.addProvider(&providers, ns.Feishu, "feishu", map[string]string{"webhook": ns.FeishuWebhook}, func() notice.Notifier {
-		return notice.NewFeishuNotifier(ns.FeishuWebhook, ns.FeishuSecret)
+	return s.providersFromConfig(&config.NotificationConfig{
+		Feishu:   config.FeishuConfig{Enabled: ns.Feishu, Webhook: ns.FeishuWebhook, Secret: ns.FeishuSecret},
+		Telegram: config.TelegramConfig{Enabled: ns.Telegram, BotToken: ns.TgToken, ChatID: ns.TgChat},
+		Dingtalk: config.DingtalkConfig{Enabled: ns.Dingtalk, Webhook: ns.DingWebhook, Secret: ns.DingSecret},
+		WeCom:    config.WeComConfig{Enabled: ns.WeCom, Webhook: ns.WeComWebhook},
+		Bark:     config.BarkConfig{Enabled: ns.Bark, Key: ns.BarkKey, Endpoint: ns.BarkEndpoint},
+		Discord:  config.DiscordConfig{Enabled: ns.Discord, Webhook: ns.DiscordWebhook},
+		Email:    config.EmailConfig{Enabled: ns.Email, Host: ns.EmailHost, Port: ns.EmailPort, User: ns.EmailUser, Pass: ns.EmailPass, From: ns.EmailFrom, To: ns.EmailTo},
+		Webhook:  config.WebhookConfig{Enabled: ns.Webhook, URL: ns.WebhookURL, Secret: ns.WebhookSecret},
 	})
-	s.addProvider(&providers, ns.Telegram, "telegram", map[string]string{"bot_token": ns.TgToken, "chat_id": ns.TgChat}, func() notice.Notifier {
-		return notice.NewTelegramNotifier(ns.TgToken, ns.TgChat)
-	})
-	s.addProvider(&providers, ns.Dingtalk, "dingtalk", map[string]string{"webhook": ns.DingWebhook}, func() notice.Notifier {
-		return notice.NewDingtalkNotifier(ns.DingWebhook, ns.DingSecret)
-	})
-	s.addProvider(&providers, ns.WeCom, "wecom", map[string]string{"webhook": ns.WeComWebhook}, func() notice.Notifier {
-		return notice.NewWeComNotifier(ns.WeComWebhook)
-	})
-	s.addProvider(&providers, ns.Bark, "bark", map[string]string{"key": ns.BarkKey}, func() notice.Notifier {
-		return notice.NewBarkNotifier(ns.BarkKey, ns.BarkEndpoint)
-	})
-	s.addProvider(&providers, ns.Discord, "discord", map[string]string{"webhook": ns.DiscordWebhook}, func() notice.Notifier {
-		return notice.NewDiscordNotifier(ns.DiscordWebhook)
-	})
-	s.addProvider(&providers, ns.Email, "email", map[string]string{"host": ns.EmailHost, "to": ns.EmailTo}, func() notice.Notifier {
-		return notice.NewEmailNotifier(ns.EmailHost, ns.EmailPort, ns.EmailUser, ns.EmailPass, ns.EmailFrom, ns.EmailTo)
-	})
-	s.addProvider(&providers, ns.Webhook, "webhook", map[string]string{"url": ns.WebhookURL}, func() notice.Notifier {
-		return notice.NewWebhookNotifier(ns.WebhookURL, ns.WebhookSecret)
-	})
-	return providers
+}
+
+func notificationConfigFromSettings(ns noticeSettings) config.NotificationConfig {
+	return config.NotificationConfig{
+		Feishu:   config.FeishuConfig{Enabled: ns.Feishu, Webhook: ns.FeishuWebhook, Secret: ns.FeishuSecret},
+		Telegram: config.TelegramConfig{Enabled: ns.Telegram, BotToken: ns.TgToken, ChatID: ns.TgChat},
+		Dingtalk: config.DingtalkConfig{Enabled: ns.Dingtalk, Webhook: ns.DingWebhook, Secret: ns.DingSecret},
+		WeCom:    config.WeComConfig{Enabled: ns.WeCom, Webhook: ns.WeComWebhook},
+		Bark:     config.BarkConfig{Enabled: ns.Bark, Key: ns.BarkKey, Endpoint: ns.BarkEndpoint},
+		Discord:  config.DiscordConfig{Enabled: ns.Discord, Webhook: ns.DiscordWebhook},
+		Email:    config.EmailConfig{Enabled: ns.Email, Host: ns.EmailHost, Port: ns.EmailPort, User: ns.EmailUser, Pass: ns.EmailPass, From: ns.EmailFrom, To: ns.EmailTo},
+		Webhook:  config.WebhookConfig{Enabled: ns.Webhook, URL: ns.WebhookURL, Secret: ns.WebhookSecret},
+	}
 }
 
 func (s *NoticeService) addProvider(providers *[]notice.Notifier, enabled bool, name string, required map[string]string, create func() notice.Notifier) {
@@ -206,6 +242,34 @@ func (s *NoticeService) addProvider(providers *[]notice.Notifier, enabled bool, 
 	*providers = append(*providers, create())
 }
 
+func (s *NoticeService) SendTest(ctx context.Context, providerName string) error {
+	providerName = strings.ToLower(strings.TrimSpace(providerName))
+	allowed := map[string]bool{"feishu": true, "telegram": true, "dingtalk": true, "wecom": true, "bark": true, "discord": true, "email": true, "webhook": true}
+	if !allowed[providerName] {
+		return fmt.Errorf("unsupported notification provider")
+	}
+
+	s.mu.RLock()
+	var target notice.Notifier
+	for _, provider := range s.providers {
+		if provider.Name() == providerName {
+			target = provider
+			break
+		}
+	}
+	s.mu.RUnlock()
+	if target == nil {
+		return fmt.Errorf("notification provider is not enabled or configured")
+	}
+
+	sendCtx, cancel := context.WithTimeout(ctx, noticeSendTimeout)
+	defer cancel()
+	if err := target.Send(sendCtx, fmt.Sprintf("【Shortlink】通知渠道测试\n时间: %s", nowStr())); err != nil {
+		return fmt.Errorf("notification test failed: %w", err)
+	}
+	return nil
+}
+
 func (s *NoticeService) SendLoginEvent(ctx context.Context, success bool, ip string) {
 	status := "❌ 失败"
 	if success {
@@ -219,6 +283,23 @@ func (s *NoticeService) SendSuffixChanged(ctx context.Context, newSuffix, baseUR
 	entry := suffixEntry(baseURL, newSuffix)
 	msg := fmt.Sprintf("【短链系统】管理后缀已更换\n新入口: %s\n时间: %s", entry, nowStr())
 	s.broadcast(ctx, msg)
+}
+
+func (s *NoticeService) SendLinkCreated(ctx context.Context, shortCode, shortURL, source string, hasPassword, isOnce bool) {
+	msg := fmt.Sprintf("【短链系统】短链创建成功\n短码: %s\n短链: %s\n来源: %s\n访问密码: %s\n一次性链接: %s\n时间: %s", shortCode, shortURL, source, boolLabel(hasPassword), boolLabel(isOnce), nowStr())
+	s.broadcast(ctx, msg)
+}
+
+func (s *NoticeService) SendBatchCreated(ctx context.Context, total, created, failed int, source string) {
+	msg := fmt.Sprintf("【短链系统】批量创建完成\n总数: %d\n成功: %d\n失败: %d\n来源: %s\n时间: %s", total, created, failed, source, nowStr())
+	s.broadcast(ctx, msg)
+}
+
+func boolLabel(value bool) string {
+	if value {
+		return "是"
+	}
+	return "否"
 }
 
 func (s *NoticeService) SendSuffixInfo(ctx context.Context, suffix, baseURL string) {
