@@ -1,5 +1,8 @@
 # Shortlink - 高安全短链服务
-
+教程连接
+````
+https://ldl-26.notion.site/shortlink
+````
 🔗 一个基于 Go 的短链系统，提供公开短链创建、动态管理后台、API Key 接入、通知告警、举报处理和多层安全防护。
 
 ## 特性
